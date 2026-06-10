@@ -1,0 +1,17 @@
+{
+  "name": "@shire/agent",
+  "private": true,
+  "scripts": {
+    "dev": "mastra dev",
+    "build": "mastra build",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mastra/core": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "mastra": "latest",
+    "typescript": "latest"
+  }
+}
