@@ -1,37 +1,40 @@
 import { env } from "./env";
 import { mastra } from "./mastra";
-import { runCvParseJob } from "./jobs/run-cv-parse";
-import { runDisputeSummaryJob } from "./jobs/run-dispute-summary";
-import { runJobMatchingJob } from "./jobs/run-job-matching";
-import { runOnchainSyncJob } from "./jobs/run-onchain-sync";
-import { runTalentMatchingJob } from "./jobs/run-talent-matching";
+import { pathToFileURL } from "node:url";
+import { jobRegistry, resolveJobName } from "./runtime/job-registry";
 
-const jobs = {
-  "cv-parse": runCvParseJob,
-  "job-matching": runJobMatchingJob,
-  "talent-matching": runTalentMatchingJob,
-  "onchain-sync": runOnchainSyncJob,
-  "dispute-summary": runDisputeSummaryJob,
-} as const;
+export function getRuntimeBootstrapOutput() {
+  return {
+    status: "runtime-ready",
+    nodeEnv: env.nodeEnv,
+    port: env.port,
+    jobs: Object.keys(jobRegistry),
+  } as const;
+}
 
-type JobName = keyof typeof jobs;
+export async function runServer(argv: readonly string[] = process.argv.slice(2)) {
+  const jobName = resolveJobName(argv[0]);
 
-async function main() {
-  const jobName = process.argv[2] as JobName | undefined;
-
-  if (jobName && jobName in jobs) {
-    const result = await jobs[jobName]();
+  if (jobName) {
+    const result = await jobRegistry[jobName]();
     console.log(JSON.stringify(result, null, 2));
-    return;
+    return result;
   }
 
   void mastra;
-  console.log(
-    `Shire agent runtime ready in ${env.nodeEnv} on port ${env.port}. Jobs: ${Object.keys(jobs).join(", ")}`,
-  );
+
+  const bootstrapOutput = getRuntimeBootstrapOutput();
+  console.log(JSON.stringify(bootstrapOutput, null, 2));
+  return bootstrapOutput;
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+const isDirectRun =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectRun) {
+  runServer().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
