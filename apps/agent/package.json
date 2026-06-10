@@ -1,17 +1,26 @@
 {
   "name": "@shire/agent",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "mastra dev",
-    "build": "mastra build",
-    "typecheck": "tsc -p tsconfig.json"
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "job:cv-parse": "tsx src/jobs/run-cv-parse.ts",
+    "job:job-matching": "tsx src/jobs/run-job-matching.ts",
+    "job:talent-matching": "tsx src/jobs/run-talent-matching.ts",
+    "job:onchain-sync": "tsx src/jobs/run-onchain-sync.ts",
+    "job:dispute-summary": "tsx src/jobs/run-dispute-summary.ts"
   },
   "dependencies": {
-    "@mastra/core": "latest"
+    "@mastra/core": "latest",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "latest",
     "mastra": "latest",
+    "tsx": "latest",
     "typescript": "latest"
   }
 }
