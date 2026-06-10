@@ -1,8 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { once } from "node:events";
 import { env } from "../src/env";
-import { getRuntimeBootstrapOutput, runServer } from "../src/server";
+import {
+  createRuntimeHttpServer,
+  getRuntimeBootstrapOutput,
+  runServer,
+} from "../src/server";
 import { jobRegistry, resolveJobName } from "../src/runtime/job-registry";
+import { jobRunnerData } from "../src/runtime/data/runtime-data";
 
 test("resolves known job names", () => {
   assert.equal(resolveJobName("cv-parse"), "cv-parse");
@@ -23,6 +29,7 @@ test("dispatches a known job from cli args", async () => {
     job: "cv-parse",
     agent: "cv-profile-agent",
     workflow: "parse-cv-workflow",
+    data: jobRunnerData["cv-parse"],
   });
 });
 
@@ -36,4 +43,39 @@ test("returns bootstrap output when no job is provided", async () => {
     port: env.port,
     jobs: Object.keys(jobRegistry),
   });
+});
+
+test("runtime http server exposes health and not-found responses", async () => {
+  const server = createRuntimeHttpServer();
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, () => resolve());
+  });
+
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+
+    const healthResponse = await fetch(
+      `http://127.0.0.1:${address.port}/health`,
+    );
+    assert.equal(healthResponse.status, 200);
+    assert.deepEqual(
+      await healthResponse.json(),
+      getRuntimeBootstrapOutput(),
+    );
+
+    const notFoundResponse = await fetch(
+      `http://127.0.0.1:${address.port}/missing`,
+    );
+    assert.equal(notFoundResponse.status, 404);
+    assert.deepEqual(await notFoundResponse.json(), {
+      status: "not-found",
+      path: "/missing",
+    });
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
 });
