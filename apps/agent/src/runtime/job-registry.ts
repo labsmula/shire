@@ -19,5 +19,7 @@ export function resolveJobName(value: string | undefined): JobName | null {
     return null;
   }
 
-  return value in jobRegistry ? (value as JobName) : null;
+  return Object.prototype.hasOwnProperty.call(jobRegistry, value)
+    ? (value as JobName)
+    : null;
 }

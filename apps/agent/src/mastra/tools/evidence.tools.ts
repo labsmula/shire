@@ -1,21 +1,29 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
+export const evidenceContextToolId = "evidence-context-tool";
+
+export const evidenceContextInputSchema = z.object({
+  referenceId: z.string(),
+  note: z.string().optional(),
+});
+
+export const evidenceContextOutputSchema = z.object({
+  contextType: z.literal("evidence"),
+  referenceId: z.string(),
+  note: z.string(),
+  status: z.literal("ready"),
+});
+
 export const evidenceContextTool = createTool({
-  id: "evidence-context-tool",
-  description: "Return a compact evidence payload for orchestration.",
-  inputSchema: z.object({
-    referenceId: z.string(),
-    note: z.string().optional(),
-  }),
-  outputSchema: z.object({
-    referenceId: z.string(),
-    note: z.string().optional(),
-    status: z.string(),
-  }),
+  id: evidenceContextToolId,
+  description: "Return a structured evidence context payload.",
+  inputSchema: evidenceContextInputSchema,
+  outputSchema: evidenceContextOutputSchema,
   execute: async ({ referenceId, note }) => ({
+    contextType: "evidence" as const,
     referenceId,
-    note,
-    status: "loaded",
+    note: note ?? "",
+    status: "ready" as const,
   }),
 });

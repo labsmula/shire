@@ -1,4 +1,11 @@
-export const env = {
-  nodeEnv: process.env.NODE_ENV ?? "development",
-  port: Number(process.env.PORT ?? 3001),
-} as const;
+import { parseAutonomyMode } from "./runtime/autonomy";
+
+export function createEnv(input: NodeJS.ProcessEnv = process.env) {
+  return {
+    nodeEnv: input.NODE_ENV ?? "development",
+    port: Number(input.PORT ?? 3001),
+    autonomyMode: parseAutonomyMode(input.SHIRE_AUTONOMY_MODE),
+  } as const;
+}
+
+export const env = createEnv();

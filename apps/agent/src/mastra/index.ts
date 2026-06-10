@@ -14,6 +14,17 @@ import { jobContextTool } from "./tools/job.tools";
 import { matchingContextTool } from "./tools/matching.tools";
 import { evidenceContextTool } from "./tools/evidence.tools";
 
+export { parseCvWorkflowId } from "./workflows/parse-cv.workflow";
+export { jobMatchingWorkflowId } from "./workflows/job-matching.workflow";
+export { talentMatchingWorkflowId } from "./workflows/talent-matching.workflow";
+export { disputeSummaryWorkflowId } from "./workflows/dispute-summary.workflow";
+export { userContextToolId } from "./tools/user.tools";
+export { candidateContextToolId } from "./tools/candidate.tools";
+export { companyContextToolId } from "./tools/company.tools";
+export { jobContextToolId } from "./tools/job.tools";
+export { matchingContextToolId } from "./tools/matching.tools";
+export { evidenceContextToolId } from "./tools/evidence.tools";
+
 export const mastra = new Mastra({
   tools: {
     userContextTool,
