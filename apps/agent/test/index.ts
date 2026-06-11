@@ -1,4 +1,5 @@
 import "./agent-runner.test";
+import "./chat-thread.test";
 import "./env.test";
 import "./cv-normalizer.test";
 import "./guardrails.test";
