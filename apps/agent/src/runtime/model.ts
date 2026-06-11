@@ -1,4 +1,2 @@
-import { env } from "../env";
-
-export const agentModel = env.model;
+export { dynamicAgentModel as agentModel } from "./model-router";
 

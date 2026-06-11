@@ -13,6 +13,7 @@ import { companyContextTool } from "./tools/company.tools";
 import { jobContextTool } from "./tools/job.tools";
 import { matchingContextTool } from "./tools/matching.tools";
 import { evidenceContextTool } from "./tools/evidence.tools";
+import { knowledgeContextTool } from "./tools/knowledge.tools";
 
 export { parseCvWorkflowId } from "./workflows/parse-cv.workflow";
 export { jobMatchingWorkflowId } from "./workflows/job-matching.workflow";
@@ -24,6 +25,7 @@ export { companyContextToolId } from "./tools/company.tools";
 export { jobContextToolId } from "./tools/job.tools";
 export { matchingContextToolId } from "./tools/matching.tools";
 export { evidenceContextToolId } from "./tools/evidence.tools";
+export { knowledgeContextToolId } from "./tools/knowledge.tools";
 
 export const mastra = new Mastra({
   tools: {
@@ -33,6 +35,7 @@ export const mastra = new Mastra({
     jobContextTool,
     matchingContextTool,
     evidenceContextTool,
+    knowledgeContextTool,
   },
   agents: {
     cvProfileAgent,
@@ -63,4 +66,5 @@ export {
   jobContextTool,
   matchingContextTool,
   evidenceContextTool,
+  knowledgeContextTool,
 };

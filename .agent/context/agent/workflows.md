@@ -43,3 +43,15 @@
 6. Save summary to `Dispute.summary`.
 7. Save `AgentRun` log.
 8. Notify admin.
+# Cost-aware execution
+
+Agent jobs use fixed workload IDs rather than caller-selected model IDs:
+
+- `cv-parse` -> `cv-normalization` (`cheap`)
+- `job-matching` -> `job-rerank` (`cheap`)
+- `talent-matching` -> `talent-rerank` (`cheap`)
+- `dispute-summary` -> `dispute-summary` (`heavy`)
+
+Onchain sync never calls an LLM. Each routed job returns attempted models and
+normalized usage records. CV normalization and CV embedding are separate
+operations; raw CV text is not stored in memory.

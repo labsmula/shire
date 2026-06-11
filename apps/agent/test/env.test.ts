@@ -9,8 +9,40 @@ test("defaults autonomy mode to semi-autonomous", () => {
   assert.equal(env.autonomyMode, "semi-autonomous");
   assert.equal(env.logLevel, "debug");
   assert.equal(env.prettyLogs, true);
-  assert.equal(env.model, "openai/gpt-4.1-mini");
   assert.equal(env.openAiApiKey, undefined);
+});
+
+test("defaults cost-aware model, memory, and knowledge config", () => {
+  const env = createEnv({});
+
+  assert.deepEqual(env.modelChains.cheap, [
+    "openrouter/meta-llama/llama-3.3-70b-instruct:free",
+    "zai/glm-4.5-air",
+    "openai/gpt-4.1-mini",
+  ]);
+  assert.deepEqual(env.modelChains.heavy, [
+    "openai/gpt-5",
+    "zai/glm-4.5",
+  ]);
+  assert.equal(env.embeddingModel, "text-embedding-3-small");
+  assert.equal(env.agentMemoryUrl, "file:./.data/shire-agent-memory.db");
+  assert.equal(env.agentKnowledgeUrl, "file:./.data/shire-agent-knowledge.db");
+  assert.equal(env.agentKnowledgeIndex, "shire-context");
+  assert.equal(env.ragTopK, 5);
+  assert.equal(env.ragMaxCharacters, 8_000);
+});
+
+test("accepts comma-separated model chain overrides", () => {
+  const env = createEnv({
+    SHIRE_MODEL_CHEAP:
+      "openrouter/qwen/qwen3-4b:free,zai/glm-4.5-air,openai/gpt-4.1-mini",
+  });
+
+  assert.deepEqual(env.modelChains.cheap, [
+    "openrouter/qwen/qwen3-4b:free",
+    "zai/glm-4.5-air",
+    "openai/gpt-4.1-mini",
+  ]);
 });
 
 test("parses a valid autonomy mode from SHIRE_AUTONOMY_MODE", () => {
@@ -28,12 +60,20 @@ test("parses custom agent config from environment variables", () => {
     NODE_ENV: "production",
     SHIRE_LOG_LEVEL: "warn",
     SHIRE_PRETTY_LOGS: "false",
-    SHIRE_MODEL: "openai/gpt-4.1",
+    SHIRE_MODEL_HEAVY: "openai/gpt-5.1",
     OPENAI_API_KEY: "secret",
+    OPENROUTER_API_KEY: "router-secret",
+    ZAI_API_KEY: "zai-secret",
   });
 
   assert.equal(env.logLevel, "warn");
   assert.equal(env.prettyLogs, false);
-  assert.equal(env.model, "openai/gpt-4.1");
+  assert.deepEqual(env.modelChains.heavy, ["openai/gpt-5.1"]);
   assert.equal(env.openAiApiKey, "secret");
+  assert.equal(env.openRouterApiKey, "router-secret");
+  assert.equal(env.zaiApiKey, "zai-secret");
+});
+
+test("rejects invalid positive integer config", () => {
+  assert.throws(() => createEnv({ SHIRE_RAG_TOP_K: "0" }));
 });

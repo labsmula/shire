@@ -48,3 +48,9 @@ Save recommendation, show in dashboard.
 score < 70:
 Ignore.
 ```
+# Retrieval-first model usage
+
+Matching applies deterministic hard filters and documented rule scores before
+any model call. Vector retrieval narrows the candidate set. Only the reduced
+set may use a cheap reranker, and borderline conflicting signals may escalate.
+Broad candidate/job retrieval never invokes an LLM.
