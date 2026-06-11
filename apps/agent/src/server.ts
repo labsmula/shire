@@ -7,6 +7,10 @@ import { MastraServer } from "@mastra/express";
 import { logger } from "./runtime/logger";
 import { jobRegistry, resolveJobName } from "./runtime/job-registry";
 import { summarizeChatRequestBody } from "./runtime/chat-request-logging";
+import {
+  classifyChatRequest,
+  createChatFallbackStream,
+} from "./runtime/chat-guard";
 
 const runtimeLogger = logger.child({ component: "runtime" });
 
@@ -64,6 +68,41 @@ export async function createRuntimeHttpServer(): Promise<Server> {
     });
 
     next();
+  });
+
+  app.use("/chat/:agentId", (request, response, next) => {
+    if (
+      request.method !== "POST" ||
+      request.params.agentId !== "role-aware-chat-agent"
+    ) {
+      next();
+      return;
+    }
+
+    const decision = classifyChatRequest(request.body);
+    if (decision.decision === "allow") {
+      next();
+      return;
+    }
+
+    runtimeLogger.warn(
+      {
+        agentId: request.params.agentId,
+        classification: decision.decision,
+        messageLength: decision.messageLength,
+      },
+      "chat request blocked by pre-model guard",
+    );
+
+    response
+      .status(200)
+      .set({
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+        "content-type": "text/event-stream; charset=utf-8",
+        "x-vercel-ai-ui-message-stream": "v1",
+      })
+      .send(createChatFallbackStream(decision));
   });
 
   app.get("/health", (_request, response) => {

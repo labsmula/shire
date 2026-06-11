@@ -3,7 +3,10 @@ import { chatRoute } from "@mastra/ai-sdk";
 import { cvProfileAgent } from "./agents/cv-profile.agent";
 import { disputeSummaryAgent } from "./agents/dispute-summary.agent";
 import { jobMatchingAgent } from "./agents/job-matching.agent";
-import { roleAwareChatAgent } from "./agents/role-aware-chat.agent";
+import {
+  roleAwareChatAgent,
+  roleAwareChatInstructions,
+} from "./agents/role-aware-chat.agent";
 import { talentMatchingAgent } from "./agents/talent-matching.agent";
 import { parseCvWorkflow } from "./workflows/parse-cv.workflow";
 import { jobMatchingWorkflow } from "./workflows/job-matching.workflow";
@@ -73,6 +76,7 @@ export {
   disputeSummaryAgent,
   jobMatchingAgent,
   roleAwareChatAgent,
+  roleAwareChatInstructions,
   talentMatchingAgent,
   parseCvWorkflow,
   jobMatchingWorkflow,
