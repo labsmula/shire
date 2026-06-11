@@ -3,6 +3,7 @@ import "./chat-thread.test";
 import "./env.test";
 import "./cv-normalizer.test";
 import "./guardrails.test";
+import "./chat-agent.test";
 import "./jobs-data.test";
 import "./knowledge.test";
 import "./memory.test";

@@ -1,7 +1,9 @@
 import { Mastra } from "@mastra/core";
+import { chatRoute } from "@mastra/ai-sdk";
 import { cvProfileAgent } from "./agents/cv-profile.agent";
 import { disputeSummaryAgent } from "./agents/dispute-summary.agent";
 import { jobMatchingAgent } from "./agents/job-matching.agent";
+import { roleAwareChatAgent } from "./agents/role-aware-chat.agent";
 import { talentMatchingAgent } from "./agents/talent-matching.agent";
 import { parseCvWorkflow } from "./workflows/parse-cv.workflow";
 import { jobMatchingWorkflow } from "./workflows/job-matching.workflow";
@@ -28,6 +30,13 @@ export { evidenceContextToolId } from "./tools/evidence.tools";
 export { knowledgeContextToolId } from "./tools/knowledge.tools";
 
 export const mastra = new Mastra({
+  server: {
+    apiRoutes: [
+      chatRoute({
+        path: "/chat/:agentId",
+      }),
+    ],
+  },
   tools: {
     userContextTool,
     candidateContextTool,
@@ -42,6 +51,7 @@ export const mastra = new Mastra({
     jobMatchingAgent,
     talentMatchingAgent,
     disputeSummaryAgent,
+    roleAwareChatAgent,
   },
   workflows: {
     parseCvWorkflow,
@@ -55,6 +65,7 @@ export {
   cvProfileAgent,
   disputeSummaryAgent,
   jobMatchingAgent,
+  roleAwareChatAgent,
   talentMatchingAgent,
   parseCvWorkflow,
   jobMatchingWorkflow,
