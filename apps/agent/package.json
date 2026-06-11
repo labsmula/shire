@@ -10,12 +10,20 @@
     "typecheck": "tsc -p tsconfig.json",
     "job:cv-parse": "node --import tsx src/jobs/run-cv-parse.ts",
     "job:job-matching": "node --import tsx src/jobs/run-job-matching.ts",
+    "job:knowledge-sync": "node --import tsx src/jobs/run-knowledge-sync.ts",
     "job:talent-matching": "node --import tsx src/jobs/run-talent-matching.ts",
     "job:onchain-sync": "node --import tsx src/jobs/run-onchain-sync.ts",
     "job:dispute-summary": "node --import tsx src/jobs/run-dispute-summary.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.69",
+    "@ai-sdk/openai-compatible": "^2.0.48",
     "@mastra/core": "latest",
+    "@mastra/libsql": "^1.12.1",
+    "@mastra/memory": "^1.20.2",
+    "@mastra/rag": "^2.2.1",
+    "@openrouter/ai-sdk-provider": "^2.9.1",
+    "ai": "^6.0.201",
     "pino": "^10.3.1",
     "zod": "^4.0.0"
   },

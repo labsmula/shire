@@ -22,6 +22,10 @@ import {
   matchingContextToolId,
 } from "../src/mastra/tools/matching.tools";
 import {
+  knowledgeContextTool,
+  knowledgeContextToolId,
+} from "../src/mastra/tools/knowledge.tools";
+import {
   userContextTool,
   userContextToolId,
 } from "../src/mastra/tools/user.tools";
@@ -33,6 +37,20 @@ test("context tool ids stay stable", () => {
   assert.equal(jobContextTool.id, jobContextToolId);
   assert.equal(matchingContextTool.id, matchingContextToolId);
   assert.equal(evidenceContextTool.id, evidenceContextToolId);
+  assert.equal(knowledgeContextTool.id, knowledgeContextToolId);
+});
+
+test("knowledge context tool requires a bounded query", () => {
+  assert.deepEqual(knowledgeContextTool.inputSchema?.parse({
+    query: "matching rules",
+    topK: 5,
+  }), {
+    query: "matching rules",
+    topK: 5,
+  });
+  assert.throws(() =>
+    knowledgeContextTool.inputSchema?.parse({ query: "", topK: 11 }),
+  );
 });
 
 test("user context tool returns a structured user context", async () => {

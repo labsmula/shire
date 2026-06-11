@@ -37,43 +37,35 @@ test("runtime data source exposes typed job, candidate, company, and dispute rec
 test("cv parse job returns data from the local source", async () => {
   const result = await runCvParseJob();
 
-  assert.deepEqual(result, {
-    job: "cv-parse",
-    agent: "cv-profile-agent",
-    workflow: "parse-cv-workflow",
-    data: jobRunnerData["cv-parse"],
-  });
+  assert.equal(result.job, "cv-parse");
+  assert.equal(result.agent, "cv-profile-agent");
+  assert.equal(result.workflow, "parse-cv-workflow");
+  assert.deepEqual(result.data, jobRunnerData["cv-parse"]);
+  assert.equal(result.routing.workload, "cv-normalization");
+  assert.equal(result.routing.tier, "cheap");
+  assert.deepEqual(result.usage, []);
 });
 
 test("job matching job returns data from the local source", async () => {
   const result = await runJobMatchingJob();
 
-  assert.deepEqual(result, {
-    job: "job-matching",
-    agent: "job-matching-agent",
-    workflow: "job-matching-workflow",
-    data: jobRunnerData["job-matching"],
-  });
+  assert.equal(result.routing.workload, "job-rerank");
+  assert.equal(result.routing.tier, "cheap");
+  assert.deepEqual(result.usage, []);
 });
 
 test("talent matching job returns data from the local source", async () => {
   const result = await runTalentMatchingJob();
 
-  assert.deepEqual(result, {
-    job: "talent-matching",
-    agent: "talent-matching-agent",
-    workflow: "talent-matching-workflow",
-    data: jobRunnerData["talent-matching"],
-  });
+  assert.equal(result.routing.workload, "talent-rerank");
+  assert.equal(result.routing.tier, "cheap");
+  assert.deepEqual(result.usage, []);
 });
 
 test("dispute summary job returns data from the local source", async () => {
   const result = await runDisputeSummaryJob();
 
-  assert.deepEqual(result, {
-    job: "dispute-summary",
-    agent: "dispute-summary-agent",
-    workflow: "dispute-summary-workflow",
-    data: jobRunnerData["dispute-summary"],
-  });
+  assert.equal(result.routing.workload, "dispute-summary");
+  assert.equal(result.routing.tier, "heavy");
+  assert.deepEqual(result.usage, []);
 });

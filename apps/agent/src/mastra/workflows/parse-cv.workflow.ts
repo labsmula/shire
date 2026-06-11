@@ -1,6 +1,8 @@
 import { createStep, createWorkflow } from "@mastra/core/workflows";
 import { z } from "zod";
 
+import { processCandidateCv } from "../../runtime/cv-normalizer";
+
 export const parseCvWorkflowId = "parse-cv-workflow" as const;
 
 export const parseCvInputSchema = z.object({
@@ -64,6 +66,12 @@ export function normalizeParsedCv(rawCv: string) {
   return interpretParsedCvProfile(
     normalizeParsedCvKeywords(extractParsedCvText(rawCv)),
   );
+}
+
+export async function runParseCvPipeline(
+  input: Parameters<typeof processCandidateCv>[0],
+) {
+  return processCandidateCv(input);
 }
 
 const parseCvExtractStep = createStep({

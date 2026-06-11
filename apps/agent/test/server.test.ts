@@ -25,12 +25,12 @@ test("returns null for unknown job names", () => {
 test("dispatches a known job from cli args", async () => {
   const result = await runServer(["cv-parse"]);
 
-  assert.deepEqual(result, {
-    job: "cv-parse",
-    agent: "cv-profile-agent",
-    workflow: "parse-cv-workflow",
-    data: jobRunnerData["cv-parse"],
-  });
+  assert.equal(result.job, "cv-parse");
+  assert.equal(result.agent, "cv-profile-agent");
+  assert.equal(result.workflow, "parse-cv-workflow");
+  assert.deepEqual(result.data, jobRunnerData["cv-parse"]);
+  assert.equal(result.routing.workload, "cv-normalization");
+  assert.deepEqual(result.usage, []);
 });
 
 test("returns bootstrap output when no job is provided", async () => {

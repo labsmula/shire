@@ -1,7 +1,14 @@
+import "./agent-runner.test";
 import "./env.test";
+import "./cv-normalizer.test";
 import "./guardrails.test";
+import "./jobs-data.test";
+import "./knowledge.test";
+import "./memory.test";
+import "./model-router.test";
 import "./parse-cv-pipeline.test";
 import "./runtime.test";
 import "./server.test";
 import "./tools.test";
+import "./usage.test";
 import "./workflows.test";

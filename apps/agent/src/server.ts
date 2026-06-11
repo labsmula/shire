@@ -69,12 +69,22 @@ export async function runServer(argv: readonly string[] = process.argv.slice(2))
           },
           "job completed",
         );
-      } else {
+      } else if ("status" in result && "chain" in result) {
         runtimeLogger.info(
           {
             jobName,
             status: result.status,
             chain: result.chain,
+          },
+          "job completed",
+        );
+      } else {
+        runtimeLogger.info(
+          {
+            jobName,
+            indexedDocuments: result.indexedDocuments,
+            indexedChunks: result.indexedChunks,
+            indexName: result.indexName,
           },
           "job completed",
         );
