@@ -46,7 +46,7 @@ test("returns bootstrap output when no job is provided", async () => {
 });
 
 test("runtime http server exposes health and not-found responses", async () => {
-  const server = createRuntimeHttpServer();
+  const server = await createRuntimeHttpServer();
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -74,6 +74,41 @@ test("runtime http server exposes health and not-found responses", async () => {
       status: "not-found",
       path: "/missing",
     });
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("runtime http server exposes the role-aware chat route", async () => {
+  const server = await createRuntimeHttpServer();
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, () => resolve());
+  });
+
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/chat/role-aware-chat-agent`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messages: [],
+          memory: {
+            thread: "candidate:candidate-001",
+            resource: "candidate:candidate-001",
+          },
+          system: "Viewer: candidate-001",
+        }),
+      },
+    );
+
+    assert.notEqual(response.status, 404);
   } finally {
     server.close();
     await once(server, "close");

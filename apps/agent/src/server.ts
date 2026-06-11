@@ -1,9 +1,12 @@
 import { env } from "./env";
 import { mastra } from "./mastra";
-import { createServer } from "node:http";
+import { createServer, type Server } from "node:http";
 import { pathToFileURL } from "node:url";
+import express from "express";
+import { MastraServer } from "@mastra/express";
 import { logger } from "./runtime/logger";
 import { jobRegistry, resolveJobName } from "./runtime/job-registry";
+import { summarizeChatRequestBody } from "./runtime/chat-request-logging";
 
 const runtimeLogger = logger.child({ component: "runtime" });
 
@@ -16,28 +19,79 @@ export function getRuntimeBootstrapOutput() {
   } as const;
 }
 
-export function createRuntimeHttpServer() {
-  return createServer((request, response) => {
-    const bootstrapOutput = getRuntimeBootstrapOutput();
+export async function createRuntimeHttpServer(): Promise<Server> {
+  const app = express();
+  app.use(express.json());
 
-    if (request.url === "/health" || request.url === "/ready") {
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify(bootstrapOutput, null, 2));
-      return;
-    }
+  app.use("/chat/:agentId", (request, response, next) => {
+    const startedAt = Date.now();
+    const agentId = request.params.agentId;
 
-    response.writeHead(404, { "content-type": "application/json" });
-    response.end(
-      JSON.stringify(
-        {
-          status: "not-found",
-          path: request.url ?? "/",
-        },
-        null,
-        2,
-      ),
+    runtimeLogger.info(
+      {
+        agentId,
+        method: request.method,
+        path: request.originalUrl,
+        body: summarizeChatRequestBody(request.body),
+      },
+      "chat request received",
     );
+
+    response.on("finish", () => {
+      runtimeLogger.info(
+        {
+          agentId,
+          method: request.method,
+          path: request.originalUrl,
+          statusCode: response.statusCode,
+          durationMs: Date.now() - startedAt,
+        },
+        "chat request completed",
+      );
+
+      if (response.statusCode >= 400) {
+        runtimeLogger.error(
+          {
+            agentId,
+            method: request.method,
+            path: request.originalUrl,
+            statusCode: response.statusCode,
+            durationMs: Date.now() - startedAt,
+          },
+          "chat request failed",
+        );
+      }
+    });
+
+    next();
   });
+
+  app.get("/health", (_request, response) => {
+    response.json(getRuntimeBootstrapOutput());
+  });
+
+  app.get("/ready", (_request, response) => {
+    response.json(getRuntimeBootstrapOutput());
+  });
+
+  const server = new MastraServer({ app, mastra });
+  await server.init();
+
+  runtimeLogger.info(
+    {
+      routes: ["/health", "/ready", "/chat/:agentId"],
+    },
+    "runtime http routes ready",
+  );
+
+  app.use((request, response) => {
+    response.status(404).json({
+      status: "not-found",
+      path: request.url ?? "/",
+    });
+  });
+
+  return createServer(app);
 }
 
 export async function runServer(argv: readonly string[] = process.argv.slice(2)) {
@@ -117,7 +171,7 @@ export async function startRuntimeService() {
   void mastra;
 
   const bootstrapOutput = getRuntimeBootstrapOutput();
-  const server = createRuntimeHttpServer();
+  const server = await createRuntimeHttpServer();
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
