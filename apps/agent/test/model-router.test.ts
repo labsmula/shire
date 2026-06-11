@@ -5,7 +5,10 @@ import {
   getWorkloadPolicy,
   shouldEscalate,
 } from "../src/runtime/model-policy";
-import { createModelFallbackChain } from "../src/runtime/model-router";
+import {
+  createModelFallbackChain,
+  resolveRuntimeAgentModelId,
+} from "../src/runtime/model-router";
 
 test("routes routine CV normalization to the cheap tier", () => {
   assert.equal(getWorkloadPolicy("cv-normalization").tier, "cheap");
@@ -54,4 +57,10 @@ test("creates a Mastra fallback entry for each configured model", () => {
       { model: "openai/mini", maxRetries: 1 },
     ],
   );
+});
+
+test("uses Z.ai as the default chat model when workload is missing", () => {
+  const result = resolveRuntimeAgentModelId();
+
+  assert.equal(result, "zai/zai/glm-4.5-air");
 });
