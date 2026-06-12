@@ -2,6 +2,7 @@ import { Agent } from "@mastra/core/agent";
 
 import { agentMemory } from "../../runtime/memory";
 import { agentModel } from "../../runtime/model";
+import { chatOutputProcessor } from "../processors/chat-output.processor";
 
 export const roleAwareChatInstructions = `
 You are Shire's role-aware assistant.
@@ -32,4 +33,6 @@ export const roleAwareChatAgent = new Agent({
   instructions: roleAwareChatInstructions,
   model: agentModel,
   memory: agentMemory,
+  outputProcessors: [chatOutputProcessor],
+  maxProcessorRetries: 0,
 });
