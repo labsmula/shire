@@ -245,7 +245,7 @@ test("blocks prompt injection hidden in conversation history", () => {
   );
 });
 
-test("blocks only clear unrelated intents", () => {
+test("allows unrelated questions by default", () => {
   for (const text of [
     "Give me a chocolate cake recipe.",
     "What is the weather in Jakarta today?",
@@ -257,7 +257,7 @@ test("blocks only clear unrelated intents", () => {
       classifyChatRequest({
         messages: [{ role: "user", content: text }],
       }).decision,
-      "out-of-scope",
+      "allow",
       text,
     );
   }

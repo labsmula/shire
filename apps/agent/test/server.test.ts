@@ -216,7 +216,7 @@ test("chat route blocks prompt injection with a deterministic stream", async () 
   }
 });
 
-test("chat route blocks unrelated questions with an English fallback", async () => {
+test("chat route forwards unrelated questions to the agent", async () => {
   const server = await createRuntimeHttpServer();
 
   await new Promise<void>((resolve, reject) => {
@@ -249,7 +249,7 @@ test("chat route blocks unrelated questions with an English fallback", async () 
     const body = await response.text();
 
     assert.equal(response.status, 200);
-    assert.ok(body.includes(JSON.stringify(OUT_OF_SCOPE_RESPONSE)));
+    assert.ok(!body.includes(JSON.stringify(OUT_OF_SCOPE_RESPONSE)));
   } finally {
     server.close();
     await once(server, "close");

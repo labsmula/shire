@@ -26,4 +26,5 @@ await Promise.all([
   import("./chat-validation.test"),
   import("./rate-limit.test"),
   import("./chat-caller.test"),
+  import("./security-indicators.test"),
 ]);
