@@ -43,3 +43,27 @@ files are excluded from memory.
 Run `npm run job:knowledge-sync --workspace=@shire/agent` to index the approved
 repository manifest. Job results expose routing metadata plus normalized model,
 provider, token, latency, retry, and escalation fields.
+
+## Product knowledge
+
+The role-aware chat assistant uses curated product documents:
+
+- `.agent/knowledge/product/shire-general.md`
+- `.agent/knowledge/product/shire-candidate.md`
+- `.agent/knowledge/product/shire-recruiter.md`
+
+Synchronize the vector index after changing these files:
+
+```bash
+npm run dev --workspace=@shire/agent -- knowledge-sync
+```
+
+Candidate chat retrieves `general + candidate` chunks. Recruiter chat retrieves
+`general + recruiter` chunks. The prompt-injection and out-of-scope guard runs
+before retrieval.
+
+When the vector index is available, product retrieval uses the configured
+embedding provider. If the index is missing, chat falls back to deterministic
+role-filtered retrieval from the curated local Markdown files. If retrieval
+still fails, chat continues without product chunks and the agent must not invent
+unavailable product behavior.

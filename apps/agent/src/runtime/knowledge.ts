@@ -9,6 +9,7 @@ import { env } from "../env";
 import { embedText, embedTexts } from "./embeddings";
 import {
   knowledgeSources,
+  productKnowledgeSources,
   type ProductKnowledgeAudience,
 } from "./knowledge-sources";
 
@@ -40,9 +41,16 @@ export type KnowledgeSearchDependencies = {
       metadata?: Record<string, unknown>;
     }>
   >;
+  localDocuments?: ProductKnowledgeDocument[];
 };
 
 type KnowledgeState = Record<string, string>;
+
+type ProductKnowledgeDocument = {
+  audience: ProductKnowledgeAudience;
+  path: string;
+  text: string;
+};
 
 function getSourceAudience(source: (typeof knowledgeSources)[number]) {
   return "audience" in source ? source.audience : "";
@@ -111,6 +119,45 @@ function resolveRepoRoot(start = process.cwd()) {
     }
     current = parent;
   }
+}
+
+function loadLocalProductDocuments(): ProductKnowledgeDocument[] {
+  const repoRoot = resolveRepoRoot();
+
+  return productKnowledgeSources.map((source) => ({
+    audience: source.audience,
+    path: source.path,
+    text: readFileSync(join(repoRoot, source.path), "utf8"),
+  }));
+}
+
+function searchLocalProductKnowledge(
+  query: string,
+  role: ProductKnowledgeRole,
+  documents: ProductKnowledgeDocument[],
+) {
+  const terms = query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((term) => term.length > 2);
+  const allowedAudiences = new Set<ProductKnowledgeAudience>([
+    "general",
+    role,
+  ]);
+
+  return limitKnowledgeResults(
+    documents
+      .filter((document) => allowedAudiences.has(document.audience))
+      .filter((document) => {
+        const normalized = document.text.toLowerCase();
+        return terms.some((term) => normalized.includes(term));
+      })
+      .map((document) => ({
+        path: document.path,
+        text: document.text,
+      })),
+    env.ragMaxCharacters,
+  );
 }
 
 function localPathFromFileUrl(url: string) {
@@ -254,12 +301,13 @@ async function searchKnowledgeWithFilter(
   query: string,
   filter: KnowledgeFilter,
   dependencies?: KnowledgeSearchDependencies,
+  onMissingIndex?: () => KnowledgeResult[],
 ) {
   const vector = dependencies ? undefined : createKnowledgeVector();
   const indexes = dependencies?.indexes ?? (await vector!.listIndexes());
 
   if (!indexes.includes(env.agentKnowledgeIndex)) {
-    return [];
+    return onMissingIndex?.() ?? [];
   }
 
   const { embedding } = await (dependencies?.embed ?? embedText)(query);
@@ -310,5 +358,11 @@ export function searchProductKnowledge(
     query,
     buildKnowledgeFilter({ corpus: "product", role }),
     dependencies,
+    () =>
+      searchLocalProductKnowledge(
+        query,
+        role,
+        dependencies?.localDocuments ?? loadLocalProductDocuments(),
+      ),
   );
 }

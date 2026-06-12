@@ -121,3 +121,44 @@ test("product retrieval passes the role filter before ranking", async () => {
     ".agent/knowledge/product/shire-candidate.md",
   );
 });
+
+test("product retrieval falls back to local role-filtered documents", async () => {
+  const results = await searchProductKnowledge(
+    "How does staking work?",
+    "candidate",
+    {
+      indexes: [],
+      embed: async () => {
+        throw new Error("embedding should not run");
+      },
+      query: async () => {
+        throw new Error("vector query should not run");
+      },
+      localDocuments: [
+        {
+          audience: "general",
+          path: ".agent/knowledge/product/shire-general.md",
+          text: "Shire uses escrow staking for applications.",
+        },
+        {
+          audience: "candidate",
+          path: ".agent/knowledge/product/shire-candidate.md",
+          text: "Candidates approve staking in their wallet.",
+        },
+        {
+          audience: "recruiter",
+          path: ".agent/knowledge/product/shire-recruiter.md",
+          text: "Recruiters manage company staking.",
+        },
+      ],
+    },
+  );
+
+  assert.deepEqual(
+    results.map((result) => result.path),
+    [
+      ".agent/knowledge/product/shire-general.md",
+      ".agent/knowledge/product/shire-candidate.md",
+    ],
+  );
+});
