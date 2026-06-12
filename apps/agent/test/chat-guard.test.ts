@@ -82,6 +82,26 @@ test("allows employment questions grounded in the current context", () => {
   );
 });
 
+test("allows brief social conversation without opening general-purpose scope", () => {
+  for (const text of [
+    "hello",
+    "Hallo!",
+    "Hi there",
+    "Good morning",
+    "How are you?",
+    "Thank you",
+    "Bye",
+  ]) {
+    assert.equal(
+      classifyChatRequest({
+        messages: [{ role: "user", parts: [{ type: "text", text }] }],
+      }).decision,
+      "allow",
+      text,
+    );
+  }
+});
+
 test("blocks instruction override attempts even when they mention jobs", () => {
   assert.equal(
     classifyChatRequest({
