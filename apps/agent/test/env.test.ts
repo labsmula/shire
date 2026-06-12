@@ -10,6 +10,7 @@ test("defaults autonomy mode to semi-autonomous", () => {
   assert.equal(env.logLevel, "debug");
   assert.equal(env.prettyLogs, true);
   assert.equal(env.openAiApiKey, undefined);
+  assert.equal(env.zaiBaseUrl, "https://api.z.ai/api/coding/paas/v4");
 });
 
 test("defaults cost-aware model, memory, and knowledge config", () => {
@@ -17,12 +18,12 @@ test("defaults cost-aware model, memory, and knowledge config", () => {
 
   assert.deepEqual(env.modelChains.cheap, [
     "openrouter/meta-llama/llama-3.3-70b-instruct:free",
-    "zai/glm-4.5-air",
+    "zai/zai/glm-4.5-air",
     "openai/gpt-4.1-mini",
   ]);
   assert.deepEqual(env.modelChains.heavy, [
     "openai/gpt-5",
-    "zai/glm-4.5",
+    "zai/zai/glm-4.5",
   ]);
   assert.equal(env.embeddingModel, "text-embedding-3-small");
   assert.equal(env.agentMemoryUrl, "file:./.data/shire-agent-memory.db");
@@ -35,12 +36,12 @@ test("defaults cost-aware model, memory, and knowledge config", () => {
 test("accepts comma-separated model chain overrides", () => {
   const env = createEnv({
     SHIRE_MODEL_CHEAP:
-      "openrouter/qwen/qwen3-4b:free,zai/glm-4.5-air,openai/gpt-4.1-mini",
+      "openrouter/qwen/qwen3-4b:free,zai/zai/glm-4.5-air,openai/gpt-4.1-mini",
   });
 
   assert.deepEqual(env.modelChains.cheap, [
     "openrouter/qwen/qwen3-4b:free",
-    "zai/glm-4.5-air",
+    "zai/zai/glm-4.5-air",
     "openai/gpt-4.1-mini",
   ]);
 });
@@ -64,6 +65,7 @@ test("parses custom agent config from environment variables", () => {
     OPENAI_API_KEY: "secret",
     OPENROUTER_API_KEY: "router-secret",
     ZAI_API_KEY: "zai-secret",
+    ZAI_BASE_URL: "https://api.z.ai/api/coding/paas/v4",
   });
 
   assert.equal(env.logLevel, "warn");
@@ -72,6 +74,7 @@ test("parses custom agent config from environment variables", () => {
   assert.equal(env.openAiApiKey, "secret");
   assert.equal(env.openRouterApiKey, "router-secret");
   assert.equal(env.zaiApiKey, "zai-secret");
+  assert.equal(env.zaiBaseUrl, "https://api.z.ai/api/coding/paas/v4");
 });
 
 test("rejects invalid positive integer config", () => {

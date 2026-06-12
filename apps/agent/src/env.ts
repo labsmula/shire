@@ -52,17 +52,17 @@ export function createEnv(input: NodeJS.ProcessEnv = process.env) {
     modelChains: {
       cheap: parseModelChain(input.SHIRE_MODEL_CHEAP, [
         "openrouter/meta-llama/llama-3.3-70b-instruct:free",
-        "zai/glm-4.5-air",
+        "zai/zai/glm-4.5-air",
         "openai/gpt-4.1-mini",
       ]),
       balanced: parseModelChain(input.SHIRE_MODEL_BALANCED, [
-        "zai/glm-4.5-air",
+        "zai/zai/glm-4.5-air",
         "openrouter/qwen/qwen3-32b",
         "openai/gpt-4.1-mini",
       ]),
       heavy: parseModelChain(input.SHIRE_MODEL_HEAVY, [
         "openai/gpt-5",
-        "zai/glm-4.5",
+        "zai/zai/glm-4.5",
       ]),
     },
     embeddingModel: input.SHIRE_EMBEDDING_MODEL?.trim() || "text-embedding-3-small",
@@ -81,6 +81,8 @@ export function createEnv(input: NodeJS.ProcessEnv = process.env) {
     openAiApiKey: input.OPENAI_API_KEY?.trim() || undefined,
     openRouterApiKey: input.OPENROUTER_API_KEY?.trim() || undefined,
     zaiApiKey: input.ZAI_API_KEY?.trim() || undefined,
+    zaiBaseUrl:
+      input.ZAI_BASE_URL?.trim() || "https://api.z.ai/api/coding/paas/v4",
   } as const;
 }
 
