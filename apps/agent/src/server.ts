@@ -11,8 +11,14 @@ import {
   classifyChatRequest,
   createChatFallbackStream,
 } from "./runtime/chat-guard";
+import { searchProductKnowledge } from "./runtime/knowledge";
+import { enrichChatRequestWithProductKnowledge } from "./runtime/product-knowledge";
 
 const runtimeLogger = logger.child({ component: "runtime" });
+
+export type RuntimeHttpServerDependencies = {
+  searchProductKnowledge?: typeof searchProductKnowledge;
+};
 
 export function getRuntimeBootstrapOutput() {
   return {
@@ -23,7 +29,9 @@ export function getRuntimeBootstrapOutput() {
   } as const;
 }
 
-export async function createRuntimeHttpServer(): Promise<Server> {
+export async function createRuntimeHttpServer(
+  dependencies: RuntimeHttpServerDependencies = {},
+): Promise<Server> {
   const app = express();
   app.use(express.json());
 
@@ -70,7 +78,7 @@ export async function createRuntimeHttpServer(): Promise<Server> {
     next();
   });
 
-  app.use("/chat/:agentId", (request, response, next) => {
+  app.use("/chat/:agentId", async (request, response, next) => {
     if (
       request.method !== "POST" ||
       request.params.agentId !== "role-aware-chat-agent"
@@ -80,29 +88,49 @@ export async function createRuntimeHttpServer(): Promise<Server> {
     }
 
     const decision = classifyChatRequest(request.body);
-    if (decision.decision === "allow") {
-      next();
+    if (decision.decision !== "allow") {
+      runtimeLogger.warn(
+        {
+          agentId: request.params.agentId,
+          classification: decision.decision,
+          messageLength: decision.messageLength,
+        },
+        "chat request blocked by pre-model guard",
+      );
+
+      response
+        .status(200)
+        .set({
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+          "content-type": "text/event-stream; charset=utf-8",
+          "x-vercel-ai-ui-message-stream": "v1",
+        })
+        .send(createChatFallbackStream(decision));
       return;
     }
 
-    runtimeLogger.warn(
-      {
-        agentId: request.params.agentId,
-        classification: decision.decision,
-        messageLength: decision.messageLength,
-      },
-      "chat request blocked by pre-model guard",
+    const startedAt = Date.now();
+    const enrichment = await enrichChatRequestWithProductKnowledge(
+      request.body,
+      dependencies.searchProductKnowledge ?? searchProductKnowledge,
     );
+    request.body = enrichment.body;
 
-    response
-      .status(200)
-      .set({
-        "cache-control": "no-cache",
-        connection: "keep-alive",
-        "content-type": "text/event-stream; charset=utf-8",
-        "x-vercel-ai-ui-message-stream": "v1",
-      })
-      .send(createChatFallbackStream(decision));
+    const logContext = {
+      agentId: request.params.agentId,
+      role: enrichment.role,
+      resultCount: enrichment.resultCount,
+      durationMs: Date.now() - startedAt,
+    };
+
+    if (enrichment.retrievalFailed) {
+      runtimeLogger.warn(logContext, "product knowledge retrieval failed");
+    } else {
+      runtimeLogger.info(logContext, "product knowledge retrieval completed");
+    }
+
+    next();
   });
 
   app.get("/health", (_request, response) => {
