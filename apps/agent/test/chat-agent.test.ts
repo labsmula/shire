@@ -26,5 +26,11 @@ test("role-aware chat instructions enforce scoped security boundaries", () => {
   assert.match(roleAwareChatInstructions, /never reveal/i);
   assert.match(roleAwareChatInstructions, /authorized scope/i);
   assert.match(roleAwareChatInstructions, /Shire-related/i);
+  assert.match(roleAwareChatInstructions, /brief social pleasantries/i);
+  assert.match(roleAwareChatInstructions, /primary source/i);
+  assert.match(roleAwareChatInstructions, /product knowledge/i);
+  assert.match(roleAwareChatInstructions, /never infer access/i);
+  assert.match(roleAwareChatInstructions, /fees, stake amounts, deadlines/i);
+  assert.match(roleAwareChatInstructions, /information is unavailable/i);
   assert.match(roleAwareChatInstructions, /English by default/i);
 });

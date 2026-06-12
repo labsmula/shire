@@ -114,6 +114,14 @@ const allowedTopicPatterns = [
   /\b(salary|compensation|offer|onboarding)\b/i,
 ];
 
+const socialPleasantryPatterns = [
+  /^(hi|hello|hey|halo|hallo)(\s+(there|shire|assistant))?[!.?]*$/i,
+  /^(good\s+(morning|afternoon|evening))[!.?]*$/i,
+  /^(how\s+are\s+you|how(?:'s| is)\s+it\s+going)[!.?]*$/i,
+  /^(thanks|thank\s+you|terima\s+kasih)[!.?]*$/i,
+  /^(bye|goodbye|see\s+you)[!.?]*$/i,
+];
+
 export function classifyChatRequest(body: unknown): ChatGuardDecision {
   const text = extractLatestUserText(body);
   const messageLength = text?.length ?? 0;
@@ -131,7 +139,10 @@ export function classifyChatRequest(body: unknown): ChatGuardDecision {
     return { decision: "prompt-injection", messageLength };
   }
 
-  if (allowedTopicPatterns.some((pattern) => pattern.test(text))) {
+  if (
+    socialPleasantryPatterns.some((pattern) => pattern.test(text)) ||
+    allowedTopicPatterns.some((pattern) => pattern.test(text))
+  ) {
     return { decision: "allow", messageLength };
   }
 

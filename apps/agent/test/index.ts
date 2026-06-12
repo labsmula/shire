@@ -12,6 +12,7 @@ import "./memory.test";
 import "./model-router.test";
 import "./package-scripts.test";
 import "./parse-cv-pipeline.test";
+import "./product-knowledge.test";
 import "./runtime.test";
 import "./server.test";
 import "./zai-gateway.test";

@@ -7,7 +7,11 @@ import { MDocument } from "@mastra/rag";
 
 import { env } from "../env";
 import { embedText, embedTexts } from "./embeddings";
-import { knowledgeSources } from "./knowledge-sources";
+import {
+  knowledgeSources,
+  productKnowledgeSources,
+  type ProductKnowledgeAudience,
+} from "./knowledge-sources";
 
 export type KnowledgeResult = {
   path: string;
@@ -15,7 +19,42 @@ export type KnowledgeResult = {
   score?: number;
 };
 
+export type ProductKnowledgeRole = Exclude<
+  ProductKnowledgeAudience,
+  "general"
+>;
+
+type LibSQLQueryInput = Parameters<LibSQLVector["query"]>[0];
+type KnowledgeFilter = NonNullable<LibSQLQueryInput["filter"]>;
+
+export type KnowledgeSearchDependencies = {
+  indexes: string[];
+  embed: (query: string) => Promise<{ embedding: number[] }>;
+  query: (input: {
+    indexName: string;
+    queryVector: number[];
+    topK: number;
+    filter: KnowledgeFilter;
+  }) => Promise<
+    Array<{
+      score?: number;
+      metadata?: Record<string, unknown>;
+    }>
+  >;
+  localDocuments?: ProductKnowledgeDocument[];
+};
+
 type KnowledgeState = Record<string, string>;
+
+type ProductKnowledgeDocument = {
+  audience: ProductKnowledgeAudience;
+  path: string;
+  text: string;
+};
+
+function getSourceAudience(source: (typeof knowledgeSources)[number]) {
+  return "audience" in source ? source.audience : "";
+}
 
 export function limitKnowledgeResults(
   results: KnowledgeResult[],
@@ -47,6 +86,21 @@ export function buildKnowledgeSystemMessage(results: KnowledgeResult[]) {
   ].join("\n\n");
 }
 
+export function buildKnowledgeFilter(
+  input:
+    | { corpus: "repository" }
+    | { corpus: "product"; role: ProductKnowledgeRole },
+): KnowledgeFilter {
+  if (input.corpus === "repository") {
+    return { corpus: "repository" };
+  }
+
+  return {
+    corpus: "product",
+    audience: { $in: ["general", input.role] },
+  };
+}
+
 function hashContent(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -65,6 +119,45 @@ function resolveRepoRoot(start = process.cwd()) {
     }
     current = parent;
   }
+}
+
+function loadLocalProductDocuments(): ProductKnowledgeDocument[] {
+  const repoRoot = resolveRepoRoot();
+
+  return productKnowledgeSources.map((source) => ({
+    audience: source.audience,
+    path: source.path,
+    text: readFileSync(join(repoRoot, source.path), "utf8"),
+  }));
+}
+
+function searchLocalProductKnowledge(
+  query: string,
+  role: ProductKnowledgeRole,
+  documents: ProductKnowledgeDocument[],
+) {
+  const terms = query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((term) => term.length > 2);
+  const allowedAudiences = new Set<ProductKnowledgeAudience>([
+    "general",
+    role,
+  ]);
+
+  return limitKnowledgeResults(
+    documents
+      .filter((document) => allowedAudiences.has(document.audience))
+      .filter((document) => {
+        const normalized = document.text.toLowerCase();
+        return terms.some((term) => normalized.includes(term));
+      })
+      .map((document) => ({
+        path: document.path,
+        text: document.text,
+      })),
+    env.ragMaxCharacters,
+  );
 }
 
 function localPathFromFileUrl(url: string) {
@@ -143,6 +236,8 @@ export async function syncKnowledgeBase(input?: {
     const document = MDocument.fromMarkdown(markdown, {
       path: source.path,
       priority: source.priority,
+      corpus: source.corpus,
+      audience: getSourceAudience(source),
       contentHash,
     });
     const chunks = await document.chunk({
@@ -175,6 +270,8 @@ export async function syncKnowledgeBase(input?: {
         metadata: chunks.map((chunk) => ({
           path: source.path,
           priority: source.priority,
+          corpus: source.corpus,
+          audience: getSourceAudience(source),
           heading:
             chunk.metadata?.subsection ??
             chunk.metadata?.section ??
@@ -200,22 +297,36 @@ export async function syncKnowledgeBase(input?: {
   };
 }
 
-export async function searchKnowledge(query: string) {
-  const vector = createKnowledgeVector();
-  const indexes = await vector.listIndexes();
+async function searchKnowledgeWithFilter(
+  query: string,
+  filter: KnowledgeFilter,
+  dependencies?: KnowledgeSearchDependencies,
+  onNoResults?: () => KnowledgeResult[],
+) {
+  const vector = dependencies ? undefined : createKnowledgeVector();
+  const indexes = dependencies?.indexes ?? (await vector!.listIndexes());
 
   if (!indexes.includes(env.agentKnowledgeIndex)) {
-    return [];
+    return onNoResults?.() ?? [];
   }
 
-  const { embedding } = await embedText(query);
-  const results = await vector.query({
+  const { embedding } = await (dependencies?.embed ?? embedText)(query);
+  const queryVector =
+    dependencies?.query ??
+    ((input: {
+      indexName: string;
+      queryVector: number[];
+      topK: number;
+      filter: KnowledgeFilter;
+    }) => vector!.query(input as LibSQLQueryInput));
+  const results = await queryVector({
     indexName: env.agentKnowledgeIndex,
     queryVector: embedding,
     topK: env.ragTopK,
+    filter,
   });
 
-  return limitKnowledgeResults(
+  const selected = limitKnowledgeResults(
     results
       .map((result) => ({
         path: String(result.metadata?.path ?? "unknown"),
@@ -224,5 +335,36 @@ export async function searchKnowledge(query: string) {
       }))
       .filter((result) => result.text.length > 0),
     env.ragMaxCharacters,
+  );
+
+  return selected.length > 0 ? selected : (onNoResults?.() ?? []);
+}
+
+export function searchKnowledge(
+  query: string,
+  dependencies?: KnowledgeSearchDependencies,
+) {
+  return searchKnowledgeWithFilter(
+    query,
+    buildKnowledgeFilter({ corpus: "repository" }),
+    dependencies,
+  );
+}
+
+export function searchProductKnowledge(
+  query: string,
+  role: ProductKnowledgeRole,
+  dependencies?: KnowledgeSearchDependencies,
+) {
+  return searchKnowledgeWithFilter(
+    query,
+    buildKnowledgeFilter({ corpus: "product", role }),
+    dependencies,
+    () =>
+      searchLocalProductKnowledge(
+        query,
+        role,
+        dependencies?.localDocuments ?? loadLocalProductDocuments(),
+      ),
   );
 }
