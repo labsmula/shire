@@ -27,6 +27,19 @@ function parseModelChain(value: string | undefined, defaults: readonly string[])
   return models?.length ? models : [...defaults];
 }
 
+function parseUnitInterval(value: string | undefined, fallback: number) {
+  if (value === undefined || value.trim() === "") {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error(`Expected a unit interval between 0 and 1, received: ${value}`);
+  }
+
+  return parsed;
+}
+
 function parsePositiveInteger(value: string | undefined, fallback: number) {
   if (!value) {
     return fallback;
@@ -38,6 +51,20 @@ function parsePositiveInteger(value: string | undefined, fallback: number) {
   }
 
   return parsed;
+}
+
+function parseSecurityGuardMode(value: string | undefined) {
+  const normalized = value?.trim();
+
+  if (normalized === undefined || normalized === "") {
+    return "suspicious-only" as const;
+  }
+
+  if (normalized === "suspicious-only") {
+    return normalized;
+  }
+
+  throw new Error(`Unsupported security guard mode: ${value}`);
 }
 
 function normalizeBaseUrl(value: string) {
@@ -74,6 +101,34 @@ export function createEnv(input: NodeJS.ProcessEnv = process.env) {
     workingMemoryEnabled: parseBoolean(
       input.SHIRE_WORKING_MEMORY_ENABLED,
       false,
+    ),
+    chatMaxBodyBytes: parsePositiveInteger(input.SHIRE_CHAT_MAX_BODY_BYTES, 65_536),
+    chatMaxMessages: parsePositiveInteger(input.SHIRE_CHAT_MAX_MESSAGES, 50),
+    chatMaxMessageCharacters: parsePositiveInteger(
+      input.SHIRE_CHAT_MAX_MESSAGE_CHARACTERS,
+      8_000,
+    ),
+    chatRateLimitRequests: parsePositiveInteger(
+      input.SHIRE_CHAT_RATE_LIMIT_REQUESTS,
+      30,
+    ),
+    chatRateLimitWindowSeconds: parsePositiveInteger(
+      input.SHIRE_CHAT_RATE_LIMIT_WINDOW_SECONDS,
+      60,
+    ),
+    securityGuardEnabled: parseBoolean(input.SHIRE_SECURITY_GUARD_ENABLED, true),
+    securityGuardMode: parseSecurityGuardMode(input.SHIRE_SECURITY_GUARD_MODE),
+    securityGuardModels: parseModelChain(input.SHIRE_SECURITY_GUARD_MODELS, [
+      "openrouter/openai/gpt-oss-20b:free",
+      "openrouter/nex-agi/nex-n2-pro:free",
+    ]),
+    securityGuardThreshold: parseUnitInterval(
+      input.SHIRE_SECURITY_GUARD_THRESHOLD,
+      0.85,
+    ),
+    outputMaxCharacters: parsePositiveInteger(
+      input.SHIRE_OUTPUT_MAX_CHARACTERS,
+      12_000,
     ),
     embeddingBaseUrl: normalizeBaseUrl(
       input.SHIRE_EMBEDDING_BASE_URL?.trim() ||

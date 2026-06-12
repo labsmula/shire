@@ -36,6 +36,24 @@ test("defaults cost-aware model, memory, and knowledge config", () => {
   assert.equal(env.ragMaxCharacters, 8_000);
 });
 
+test("defaults bounded chat security config", () => {
+  const env = createEnv({});
+
+  assert.equal(env.chatMaxBodyBytes, 65_536);
+  assert.equal(env.chatMaxMessages, 50);
+  assert.equal(env.chatMaxMessageCharacters, 8_000);
+  assert.equal(env.chatRateLimitRequests, 30);
+  assert.equal(env.chatRateLimitWindowSeconds, 60);
+  assert.equal(env.securityGuardEnabled, true);
+  assert.equal(env.securityGuardMode, "suspicious-only");
+  assert.deepEqual(env.securityGuardModels, [
+    "openrouter/openai/gpt-oss-20b:free",
+    "openrouter/nex-agi/nex-n2-pro:free",
+  ]);
+  assert.equal(env.securityGuardThreshold, 0.85);
+  assert.equal(env.outputMaxCharacters, 12_000);
+});
+
 test("accepts comma-separated model chain overrides", () => {
   const env = createEnv({
     SHIRE_MODEL_CHEAP:
@@ -79,4 +97,10 @@ test("parses custom agent config from environment variables", () => {
 
 test("rejects invalid positive integer config", () => {
   assert.throws(() => createEnv({ SHIRE_RAG_TOP_K: "0" }));
+});
+
+test("rejects invalid security threshold and guard mode config", () => {
+  assert.throws(() => createEnv({ SHIRE_SECURITY_GUARD_THRESHOLD: "-0.01" }));
+  assert.throws(() => createEnv({ SHIRE_SECURITY_GUARD_THRESHOLD: "1.01" }));
+  assert.throws(() => createEnv({ SHIRE_SECURITY_GUARD_MODE: "wide-open" }));
 });
