@@ -133,6 +133,7 @@ export function buildChatProxyBody(
   const system = buildChatSystemMessage(scope);
 
   return {
+    scope,
     messages,
     memory: {
       thread: scope.threadId,

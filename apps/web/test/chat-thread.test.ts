@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildChatScopeLabel } from "../lib/chat/thread";
+import { buildChatProxyBody } from "../lib/chat/context";
+import { buildChatScope, buildChatScopeLabel } from "../lib/chat/thread";
 
 test("labels a candidate job scope clearly", () => {
   assert.equal(
@@ -21,4 +22,26 @@ test("labels a recruiter general scope clearly", () => {
     }),
     "Recruiter / General",
   );
+});
+
+test("chat proxy body includes the active structured scope", () => {
+  const scope = buildChatScope({
+    viewerId: "candidate-001",
+    role: "candidate",
+    resourceType: "job",
+    resourceId: "job-001",
+    resourceLabel: "Senior Frontend Engineer",
+  });
+
+  const body = buildChatProxyBody(scope, [
+    {
+      id: "message-1",
+      role: "user",
+      parts: [{ type: "text", text: "How does applying work?" }],
+    },
+  ]);
+
+  assert.deepEqual(body.scope, scope);
+  assert.equal(body.memory.thread, scope.threadId);
+  assert.equal(body.memory.resource, scope.resourceKey);
 });
