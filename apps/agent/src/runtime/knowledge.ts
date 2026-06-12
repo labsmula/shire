@@ -301,13 +301,13 @@ async function searchKnowledgeWithFilter(
   query: string,
   filter: KnowledgeFilter,
   dependencies?: KnowledgeSearchDependencies,
-  onMissingIndex?: () => KnowledgeResult[],
+  onNoResults?: () => KnowledgeResult[],
 ) {
   const vector = dependencies ? undefined : createKnowledgeVector();
   const indexes = dependencies?.indexes ?? (await vector!.listIndexes());
 
   if (!indexes.includes(env.agentKnowledgeIndex)) {
-    return onMissingIndex?.() ?? [];
+    return onNoResults?.() ?? [];
   }
 
   const { embedding } = await (dependencies?.embed ?? embedText)(query);
@@ -326,7 +326,7 @@ async function searchKnowledgeWithFilter(
     filter,
   });
 
-  return limitKnowledgeResults(
+  const selected = limitKnowledgeResults(
     results
       .map((result) => ({
         path: String(result.metadata?.path ?? "unknown"),
@@ -336,6 +336,8 @@ async function searchKnowledgeWithFilter(
       .filter((result) => result.text.length > 0),
     env.ragMaxCharacters,
   );
+
+  return selected.length > 0 ? selected : (onNoResults?.() ?? []);
 }
 
 export function searchKnowledge(

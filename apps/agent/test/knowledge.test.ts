@@ -162,3 +162,40 @@ test("product retrieval falls back to local role-filtered documents", async () =
     ],
   );
 });
+
+test("product retrieval falls back when an existing index has no role metadata", async () => {
+  const results = await searchProductKnowledge(
+    "How do talent recommendations work?",
+    "recruiter",
+    {
+      indexes: ["shire-context"],
+      embed: async () => ({ embedding: [0.1, 0.2] }),
+      query: async () => [],
+      localDocuments: [
+        {
+          audience: "general",
+          path: ".agent/knowledge/product/shire-general.md",
+          text: "Shire provides matching recommendations.",
+        },
+        {
+          audience: "candidate",
+          path: ".agent/knowledge/product/shire-candidate.md",
+          text: "Candidates receive job recommendations.",
+        },
+        {
+          audience: "recruiter",
+          path: ".agent/knowledge/product/shire-recruiter.md",
+          text: "Recruiters receive talent recommendations.",
+        },
+      ],
+    },
+  );
+
+  assert.deepEqual(
+    results.map((result) => result.path),
+    [
+      ".agent/knowledge/product/shire-general.md",
+      ".agent/knowledge/product/shire-recruiter.md",
+    ],
+  );
+});
