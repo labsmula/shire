@@ -11,7 +11,7 @@ export function createModelFallbackChain(models: readonly string[]) {
   return models.map((model) => ({ model, maxRetries: 1 }));
 }
 
-const defaultChatModel = "openrouter/openai/gpt-oss-20b:free";
+const defaultChatModel = "openrouter/nex-agi/nex-n2-pro:free";
 
 export function resolveModelChain(input: ModelRequestContext) {
   if (!input.workload) {

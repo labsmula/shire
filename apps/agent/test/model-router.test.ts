@@ -63,7 +63,7 @@ test("creates a Mastra fallback entry for each configured model", () => {
 test("uses a verified free OpenRouter model when workload is missing", () => {
   const result = resolveRuntimeAgentModelId();
 
-  assert.equal(result, "openrouter/openai/gpt-oss-20b:free");
+  assert.equal(result, "openrouter/nex-agi/nex-n2-pro:free");
 });
 
 test("provides the configured fallback chain to dynamic agents", () => {
@@ -74,7 +74,7 @@ test("provides the configured fallback chain to dynamic agents", () => {
   });
 
   assert.deepEqual(result, [
-    { model: "openrouter/openai/gpt-oss-20b:free", maxRetries: 1 },
     { model: "openrouter/nex-agi/nex-n2-pro:free", maxRetries: 1 },
+    { model: "openrouter/openai/gpt-oss-20b:free", maxRetries: 1 },
   ]);
 });

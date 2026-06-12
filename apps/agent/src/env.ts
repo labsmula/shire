@@ -82,12 +82,12 @@ export function createEnv(input: NodeJS.ProcessEnv = process.env) {
     prettyLogs: parseBoolean(input.SHIRE_PRETTY_LOGS, nodeEnv !== "production"),
     modelChains: {
       cheap: parseModelChain(input.SHIRE_MODEL_CHEAP, [
-        "openrouter/openai/gpt-oss-20b:free",
         "openrouter/nex-agi/nex-n2-pro:free",
+        "openrouter/openai/gpt-oss-20b:free",
       ]),
       balanced: parseModelChain(input.SHIRE_MODEL_BALANCED, [
-        "openrouter/openai/gpt-oss-20b:free",
         "openrouter/nex-agi/nex-n2-pro:free",
+        "openrouter/openai/gpt-oss-20b:free",
       ]),
       heavy: parseModelChain(input.SHIRE_MODEL_HEAVY, [
         "openrouter/openai/gpt-oss-20b:free",
@@ -119,8 +119,8 @@ export function createEnv(input: NodeJS.ProcessEnv = process.env) {
     securityGuardEnabled: parseBoolean(input.SHIRE_SECURITY_GUARD_ENABLED, true),
     securityGuardMode: parseSecurityGuardMode(input.SHIRE_SECURITY_GUARD_MODE),
     securityGuardModels: parseModelChain(input.SHIRE_SECURITY_GUARD_MODELS, [
-      "openrouter/openai/gpt-oss-20b:free",
       "openrouter/nex-agi/nex-n2-pro:free",
+      "openrouter/openai/gpt-oss-20b:free",
     ]),
     securityGuardThreshold: parseUnitInterval(
       input.SHIRE_SECURITY_GUARD_THRESHOLD,

@@ -18,8 +18,8 @@ test("defaults cost-aware model, memory, and knowledge config", () => {
   const env = createEnv({});
 
   assert.deepEqual(env.modelChains.cheap, [
-    "openrouter/openai/gpt-oss-20b:free",
     "openrouter/nex-agi/nex-n2-pro:free",
+    "openrouter/openai/gpt-oss-20b:free",
   ]);
   assert.deepEqual(env.modelChains.heavy, [
     "openrouter/openai/gpt-oss-20b:free",
@@ -47,8 +47,8 @@ test("defaults bounded chat security config", () => {
   assert.equal(env.securityGuardEnabled, true);
   assert.equal(env.securityGuardMode, "suspicious-only");
   assert.deepEqual(env.securityGuardModels, [
-    "openrouter/openai/gpt-oss-20b:free",
     "openrouter/nex-agi/nex-n2-pro:free",
+    "openrouter/openai/gpt-oss-20b:free",
   ]);
   assert.equal(env.securityGuardThreshold, 0.85);
   assert.equal(env.outputMaxCharacters, 12_000);
