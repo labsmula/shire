@@ -17,11 +17,16 @@ Language models are configured as comma-separated fallback chains:
 - `SHIRE_MODEL_CHEAP`: routine extraction, summaries, and reranking
 - `SHIRE_MODEL_BALANCED`: ambiguous or repeatedly invalid structured output
 - `SHIRE_MODEL_HEAVY`: dispute and conflicting-evidence analysis
-- `SHIRE_EMBEDDING_MODEL`: direct OpenAI embedding model
+- `SHIRE_EMBEDDING_MODEL`: OpenRouter embedding model
+- `SHIRE_EMBEDDING_BASE_URL`: OpenRouter API root
+- `SHIRE_EMBEDDING_ENABLED`: enable semantic memory and vector retrieval
+- `SHIRE_WORKING_MEMORY_ENABLED`: enable tool-based persistent working memory
 
-Provider credentials use `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, and
-`ZAI_API_KEY`. Free OpenRouter availability changes over time, so model IDs are
-environment configuration rather than business logic.
+Chat and embeddings use `OPENROUTER_API_KEY`. Embeddings default to
+`qwen/qwen3-embedding-8b` through OpenRouter's embeddings endpoint. Working
+memory remains disabled because OpenRouter's free chat router may not select
+models that support tool calls; recent conversation history and semantic recall
+remain enabled.
 
 Memory and repository knowledge use separate libSQL URLs. Retrieval defaults to
 five results and an 8,000-character context budget; configure these with
@@ -31,14 +36,14 @@ five results and an 8,000-character context budget; configure these with
 
 ## Runtime policy
 
-Routine CV extraction, workflow summaries, and reduced-set reranking start on
-the `cheap` chain: OpenRouter, then Z.AI, then OpenAI mini. Ambiguous structured
-work may escalate to `balanced`. Dispute summaries start on `heavy`: strong
-OpenAI, then strong Z.AI.
+All chat tiers default to verified, explicit OpenRouter free models instead of
+the dynamic free router. This avoids transient routing to broken provider
+endpoints. Override individual tiers with comma-separated fallback chains when
+a workload needs stronger or more reliable models.
 
-CV extraction produces a Zod-validated draft. Embedding is a separate direct
-OpenAI call over canonical profile search text. Raw CV text and full evidence
-files are excluded from memory.
+CV extraction produces a Zod-validated draft. Embedding is a separate
+TokenRouter request resolved by Mastra over canonical profile search text. Raw
+CV text and full evidence files are excluded from memory.
 
 Run `npm run job:knowledge-sync --workspace=@shire/agent` to index the approved
 repository manifest. Job results expose routing metadata plus normalized model,
