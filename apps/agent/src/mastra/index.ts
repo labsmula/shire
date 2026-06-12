@@ -12,7 +12,6 @@ import { parseCvWorkflow } from "./workflows/parse-cv.workflow";
 import { jobMatchingWorkflow } from "./workflows/job-matching.workflow";
 import { talentMatchingWorkflow } from "./workflows/talent-matching.workflow";
 import { disputeSummaryWorkflow } from "./workflows/dispute-summary.workflow";
-import { zaiGateway } from "./gateways/zai.gateway";
 import { userContextTool } from "./tools/user.tools";
 import { candidateContextTool } from "./tools/candidate.tools";
 import { companyContextTool } from "./tools/company.tools";
@@ -32,13 +31,16 @@ export { jobContextToolId } from "./tools/job.tools";
 export { matchingContextToolId } from "./tools/matching.tools";
 export { evidenceContextToolId } from "./tools/evidence.tools";
 export { knowledgeContextToolId } from "./tools/knowledge.tools";
+export {
+  agentMemoryTemplate,
+  buildAgentMemoryConfig,
+  createAgentMemoryConfig,
+  createAgentMemory,
+} from "../runtime/memory";
 
 export const chatRouteVersion = "v6" as const;
 
 export const mastra = new Mastra({
-  gateways: {
-    zai: zaiGateway,
-  },
   server: {
     apiRoutes: [
       chatRoute({

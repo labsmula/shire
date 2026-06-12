@@ -28,6 +28,7 @@ type LibSQLQueryInput = Parameters<LibSQLVector["query"]>[0];
 type KnowledgeFilter = NonNullable<LibSQLQueryInput["filter"]>;
 
 export type KnowledgeSearchDependencies = {
+  embeddingsEnabled?: boolean;
   indexes: string[];
   embed: (query: string) => Promise<{ embedding: number[] }>;
   query: (input: {
@@ -303,6 +304,12 @@ async function searchKnowledgeWithFilter(
   dependencies?: KnowledgeSearchDependencies,
   onNoResults?: () => KnowledgeResult[],
 ) {
+  const embeddingsEnabled =
+    dependencies?.embeddingsEnabled ?? env.embeddingEnabled;
+  if (!embeddingsEnabled) {
+    return onNoResults?.() ?? [];
+  }
+
   const vector = dependencies ? undefined : createKnowledgeVector();
   const indexes = dependencies?.indexes ?? (await vector!.listIndexes());
 

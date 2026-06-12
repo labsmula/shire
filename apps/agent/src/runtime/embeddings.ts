@@ -1,23 +1,37 @@
-import { createOpenAI } from "@ai-sdk/openai";
+import { ModelRouterEmbeddingModel } from "@mastra/core/llm";
 import { embed, embedMany } from "ai";
 
 import { env } from "../env";
 
-function getEmbeddingModel() {
-  const openai = createOpenAI({ apiKey: env.openAiApiKey });
-  return openai.embedding(env.embeddingModel);
+(globalThis as { AI_SDK_LOG_WARNINGS?: boolean }).AI_SDK_LOG_WARNINGS = false;
+
+export interface EmbeddingModelConfig {
+  modelId?: string;
+  baseUrl?: string;
+  apiKey?: string;
+}
+
+export function createEmbeddingModel(
+  config: EmbeddingModelConfig = {},
+) {
+  return new ModelRouterEmbeddingModel({
+    providerId: "openrouter",
+    modelId: config.modelId ?? env.embeddingModel,
+    url: config.baseUrl ?? env.embeddingBaseUrl,
+    apiKey: config.apiKey ?? process.env.OPENROUTER_API_KEY,
+  });
 }
 
 export async function embedText(value: string) {
   return embed({
-    model: getEmbeddingModel(),
+    model: createEmbeddingModel(),
     value,
   });
 }
 
 export async function embedTexts(values: string[]) {
   return embedMany({
-    model: getEmbeddingModel(),
+    model: createEmbeddingModel(),
     values,
   });
 }

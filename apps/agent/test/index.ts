@@ -1,21 +1,26 @@
-import "./agent-runner.test";
-import "./chat-thread.test";
-import "./env.test";
-import "./cv-normalizer.test";
-import "./guardrails.test";
-import "./chat-agent.test";
-import "./chat-guard.test";
-import "./chat-request-logging.test";
-import "./jobs-data.test";
-import "./knowledge.test";
-import "./memory.test";
-import "./model-router.test";
-import "./package-scripts.test";
-import "./parse-cv-pipeline.test";
-import "./product-knowledge.test";
-import "./runtime.test";
-import "./server.test";
-import "./zai-gateway.test";
-import "./tools.test";
-import "./usage.test";
-import "./workflows.test";
+process.env.OPENROUTER_API_KEY ??= "test-openrouter-api-key";
+process.env.TOKENROUTER_API_KEY ??= "test-tokenrouter-api-key";
+
+await Promise.all([
+  import("./agent-runner.test"),
+  import("./chat-thread.test"),
+  import("./env.test"),
+  import("./embeddings.test"),
+  import("./cv-normalizer.test"),
+  import("./guardrails.test"),
+  import("./chat-agent.test"),
+  import("./chat-guard.test"),
+  import("./chat-request-logging.test"),
+  import("./jobs-data.test"),
+  import("./knowledge.test"),
+  import("./memory.test"),
+  import("./model-router.test"),
+  import("./package-scripts.test"),
+  import("./parse-cv-pipeline.test"),
+  import("./product-knowledge.test"),
+  import("./runtime.test"),
+  import("./server.test"),
+  import("./tools.test"),
+  import("./usage.test"),
+  import("./workflows.test"),
+]);

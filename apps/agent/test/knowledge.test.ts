@@ -95,7 +95,8 @@ test("product retrieval passes the role filter before ranking", async () => {
     "How does staking work?",
     "candidate",
     {
-      indexes: ["shire-context"],
+      embeddingsEnabled: true,
+      indexes: ["shire_context"],
       embed: async () => ({ embedding: [0.1, 0.2] }),
       query: async (input) => {
         receivedFilter = input.filter;
@@ -163,12 +164,39 @@ test("product retrieval falls back to local role-filtered documents", async () =
   );
 });
 
+test("product retrieval skips vector embedding when embeddings are disabled", async () => {
+  const results = await searchProductKnowledge(
+    "How does staking work?",
+    "candidate",
+    {
+      embeddingsEnabled: false,
+      indexes: ["shire_context"],
+      embed: async () => {
+        throw new Error("embedding should not run");
+      },
+      query: async () => {
+        throw new Error("vector query should not run");
+      },
+      localDocuments: [
+        {
+          audience: "candidate",
+          path: ".agent/knowledge/product/shire-candidate.md",
+          text: "Candidates approve staking in their wallet.",
+        },
+      ],
+    },
+  );
+
+  assert.equal(results[0]?.path, ".agent/knowledge/product/shire-candidate.md");
+});
+
 test("product retrieval falls back when an existing index has no role metadata", async () => {
   const results = await searchProductKnowledge(
     "How do talent recommendations work?",
     "recruiter",
     {
-      indexes: ["shire-context"],
+      embeddingsEnabled: true,
+      indexes: ["shire_context"],
       embed: async () => ({ embedding: [0.1, 0.2] }),
       query: async () => [],
       localDocuments: [

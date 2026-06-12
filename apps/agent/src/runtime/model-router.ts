@@ -11,7 +11,7 @@ export function createModelFallbackChain(models: readonly string[]) {
   return models.map((model) => ({ model, maxRetries: 1 }));
 }
 
-const defaultChatModel = "zai/zai/glm-4.5-air";
+const defaultChatModel = "openrouter/openai/gpt-oss-20b:free";
 
 export function resolveModelChain(input: ModelRequestContext) {
   if (!input.workload) {
@@ -43,5 +43,9 @@ export const dynamicAgentModel = ({
     | ModelTier
     | undefined;
 
-  return resolveRuntimeAgentModelId({ workload, tierOverride });
+  if (!workload) {
+    return createModelFallbackChain(env.modelChains.cheap);
+  }
+
+  return resolveModelChain({ workload, tierOverride });
 };

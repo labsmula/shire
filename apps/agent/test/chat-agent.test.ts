@@ -1,20 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
+process.env.OPENAI_API_KEY ??= "test-openai-api-key";
+process.env.OPENROUTER_API_KEY ??= "test-openrouter-api-key";
+
+const {
   chatRouteVersion,
   mastra,
   roleAwareChatAgent,
   roleAwareChatInstructions,
-} from "../src/mastra";
+} = await import("../src/mastra");
 
 test("exports the role-aware chat agent", () => {
   assert.equal(roleAwareChatAgent.id, "role-aware-chat-agent");
   assert.equal(roleAwareChatAgent.name, "Role-Aware Chat Agent");
 });
 
+test("role-aware chat does not expose tools to free OpenRouter models", async () => {
+  assert.deepEqual(await roleAwareChatAgent.listTools(), {});
+});
+
 test("loads the Mastra registry with the chat route registration", () => {
   assert.ok(mastra);
+  assert.equal(mastra.listGateways()?.zai, undefined);
 });
 
 test("uses the AI SDK v6 chat protocol required by Assistant UI", () => {
