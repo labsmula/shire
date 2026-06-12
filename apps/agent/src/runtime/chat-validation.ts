@@ -103,12 +103,11 @@ export function validateChatRequest(
     const scope = body.scope;
     if (
       typeof scope.viewerId !== "string" ||
-      typeof scope.role !== "string" ||
-      typeof scope.resourceType !== "string" ||
-      typeof scope.resourceId !== "string"
+      (scope.role !== "candidate" && scope.role !== "recruiter")
     ) {
       return { valid: false, reasonCode: "invalid-scope" };
     }
+    // resourceType and resourceId are optional
   }
 
   return {

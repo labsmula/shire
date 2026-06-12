@@ -161,6 +161,19 @@ test("validates scope with all required fields", () => {
   assert.equal(result.valid, true);
 });
 
+test("rejects unsupported scope role", () => {
+  const body = {
+    messages: [{ role: "user", content: "hello" }],
+    scope: {
+      viewerId: "candidate-001",
+      role: "admin",
+    },
+  };
+  const result = validateChatRequest(body, OPTIONS);
+  assert.equal(result.valid, false);
+  assert.equal(result.reasonCode, "invalid-scope");
+});
+
 test("ignores scope when not an object", () => {
   const body = {
     messages: [{ role: "user", content: "hello" }],
