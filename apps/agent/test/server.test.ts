@@ -366,6 +366,37 @@ test("allowed candidate chat retrieves candidate product knowledge", async () =>
   }
 });
 
+test("platform-help chat reaches the scoped agent instead of fallback", async () => {
+  let retrievalCalls = 0;
+  const { server, url } = await startTestServer({
+    searchProductKnowledge: async () => {
+      retrievalCalls += 1;
+      return [];
+    },
+  });
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        createChatBody(
+          "candidate",
+          "Bagaimana cara menggunakan aplikasi ini?",
+        ),
+      ),
+    });
+    const body = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.equal(retrievalCalls, 1);
+    assert.ok(!body.includes(JSON.stringify(OUT_OF_SCOPE_RESPONSE)));
+    assert.ok(!body.includes(JSON.stringify(PROMPT_INJECTION_RESPONSE)));
+  } finally {
+    await stopTestServer(server);
+  }
+});
+
 test("allowed recruiter chat retrieves recruiter product knowledge", async () => {
   const calls: Array<{ query: string; role: string }> = [];
   const { server, url } = await startTestServer({
