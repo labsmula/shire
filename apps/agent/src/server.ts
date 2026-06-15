@@ -3,6 +3,7 @@ import { mastra } from "./mastra";
 import { createServer, type Server } from "node:http";
 import { pathToFileURL } from "node:url";
 import express from "express";
+import multer, { MulterError } from "multer";
 import { MastraServer } from "@mastra/express";
 import { logger } from "./runtime/logger";
 import { jobRegistry, resolveJobName } from "./runtime/job-registry";
@@ -28,6 +29,17 @@ import type {
 import { InMemoryJobQueue } from "./runtime/jobs/in-memory-job-queue";
 import type { JobQueue } from "./runtime/jobs/job-queue";
 import { createJobProcessors } from "./runtime/jobs/job-processors";
+import {
+  createBullMqJobRuntime,
+  type DurableJobRuntime,
+} from "./runtime/jobs/bullmq-job-queue";
+import {
+  createDefaultCvDocumentDependencies,
+  CvDocumentError,
+  extractCvDocument,
+  type CvDocumentFile,
+} from "./runtime/cv-document";
+import { hasValidServiceToken } from "./runtime/internal-auth";
 
 const runtimeLogger = logger.child({ component: "runtime" });
 
@@ -42,6 +54,9 @@ export type RuntimeHttpServerDependencies = {
     job: ProcessableJob,
     context: { attempt: number; signal: AbortSignal },
   ) => Promise<JobResult>;
+  durableJobRuntime?: DurableJobRuntime;
+  serviceToken?: string;
+  extractCvDocument?: (file: CvDocumentFile | undefined) => Promise<string>;
 };
 
 export function getRuntimeBootstrapOutput() {
@@ -58,20 +73,110 @@ export async function createRuntimeHttpServer(
 ): Promise<Server> {
   const app = express();
   app.use(express.json());
-  const jobQueue = dependencies.jobQueue ?? new InMemoryJobQueue();
   const processors = createJobProcessors();
-  const worker = new AgentWorker({
-    queue: jobQueue,
-    process: dependencies.processJob ?? processors.process,
-  });
+  const processJob = dependencies.processJob ?? processors.process;
+  const durableJobRuntime =
+    dependencies.durableJobRuntime ??
+    (env.redisUrl
+      ? createBullMqJobRuntime({
+          redisUrl: env.redisUrl,
+          queueName: env.jobQueueName,
+          attempts: env.jobAttempts,
+          backoffMs: env.jobBackoffMs,
+          process: processJob,
+        })
+      : undefined);
+  const jobQueue =
+    dependencies.jobQueue ??
+    (durableJobRuntime ? undefined : new InMemoryJobQueue());
+  const worker = jobQueue
+    ? new AgentWorker({ queue: jobQueue, process: processJob })
+    : undefined;
   if (env.workerEnabled) {
-    worker.start();
+    if (durableJobRuntime) {
+      await durableJobRuntime.start();
+    } else {
+      worker?.start();
+    }
   }
+
+  const serviceToken = dependencies.serviceToken ?? env.agentServiceToken;
+  const cvDocumentExtractor =
+    dependencies.extractCvDocument ??
+    ((file: CvDocumentFile | undefined) =>
+      extractCvDocument(
+        file,
+        createDefaultCvDocumentDependencies(env.cvMaxFileBytes),
+      ));
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: env.cvMaxFileBytes, files: 1, fields: 1 },
+  });
+  const isAuthorized = (request: express.Request) =>
+    hasValidServiceToken(request.header("authorization"), serviceToken);
+
+  app.post("/jobs/cv-document", (request, response) => {
+    if (!isAuthorized(request)) {
+      response.status(401).json({ status: "unauthorized" });
+      return;
+    }
+
+    upload.single("file")(request, response, async (uploadError) => {
+      try {
+        if (uploadError) {
+          if (
+            uploadError instanceof MulterError &&
+            uploadError.code === "LIMIT_FILE_SIZE"
+          ) {
+            throw new CvDocumentError(
+              "CV_FILE_TOO_LARGE",
+              "The CV file exceeds the configured size limit.",
+            );
+          }
+          throw uploadError;
+        }
+
+        const candidateId =
+          typeof request.body?.candidateId === "string"
+            ? request.body.candidateId.trim()
+            : "";
+        if (!candidateId) {
+          response.status(400).json({
+            code: "CV_CANDIDATE_REQUIRED",
+            message: "A candidateId is required.",
+          });
+          return;
+        }
+
+        const rawCv = await cvDocumentExtractor(request.file);
+        const jobRequest = parseJobRequest({
+          name: "cv-parse",
+          payload: { candidateId, rawCv },
+        });
+        const job = durableJobRuntime
+          ? await durableJobRuntime.enqueue(jobRequest)
+          : await jobQueue!.enqueue(jobRequest);
+        response.status(202).json({ jobId: job.id, status: job.status });
+      } catch (error) {
+        if (error instanceof CvDocumentError) {
+          response.status(400).json({
+            code: error.code,
+            message: error.message,
+          });
+          return;
+        }
+        runtimeLogger.error({ err: error }, "CV document upload failed");
+        response.status(503).json({ status: "queue-unavailable" });
+      }
+    });
+  });
 
   app.post("/jobs", async (request, response) => {
     try {
       const parsed = parseJobRequest(request.body);
-      const job = await jobQueue.enqueue(parsed);
+      const job = durableJobRuntime
+        ? await durableJobRuntime.enqueue(parsed)
+        : await jobQueue!.enqueue(parsed);
       runtimeLogger.info(
         { jobId: job.id, jobName: job.name },
         "job queued",
@@ -86,7 +191,26 @@ export async function createRuntimeHttpServer(
   });
 
   app.get("/jobs/:jobId", async (request, response) => {
-    const job = await jobQueue.get(request.params.jobId);
+    const candidateId =
+      typeof request.query.candidateId === "string"
+        ? request.query.candidateId
+        : undefined;
+    if (candidateId && !isAuthorized(request)) {
+      response.status(401).json({ status: "unauthorized" });
+      return;
+    }
+    const job = durableJobRuntime
+      ? await durableJobRuntime.get(request.params.jobId, candidateId)
+      : await jobQueue!.get(request.params.jobId);
+    if (
+      job &&
+      candidateId &&
+      job.name === "cv-parse" &&
+      (job.payload as { candidateId: string }).candidateId !== candidateId
+    ) {
+      response.status(404).json({ status: "not-found" });
+      return;
+    }
     if (!job) {
       response.status(404).json({ status: "not-found" });
       return;
@@ -327,7 +451,14 @@ export async function createRuntimeHttpServer(
 
   runtimeLogger.info(
     {
-      routes: ["/health", "/ready", "/jobs", "/jobs/:jobId", "/chat/:agentId"],
+      routes: [
+        "/health",
+        "/ready",
+        "/jobs",
+        "/jobs/cv-document",
+        "/jobs/:jobId",
+        "/chat/:agentId",
+      ],
     },
     "runtime http routes ready",
   );
@@ -342,7 +473,11 @@ export async function createRuntimeHttpServer(
   const httpServer = createServer(app);
   httpServer.on("close", () => {
     if (env.workerEnabled) {
-      void worker.close();
+      if (durableJobRuntime) {
+        void durableJobRuntime.close();
+      } else {
+        void worker?.close();
+      }
     }
   });
   return httpServer;
@@ -423,6 +558,15 @@ export async function runServer(argv: readonly string[] = process.argv.slice(2))
 
 export async function startRuntimeService() {
   void mastra;
+
+  if (!env.redisUrl) {
+    throw new Error("REDIS_URL is required to start the agent service.");
+  }
+  if (!env.agentServiceToken) {
+    throw new Error(
+      "SHIRE_AGENT_SERVICE_TOKEN is required to start the agent service.",
+    );
+  }
 
   const bootstrapOutput = getRuntimeBootstrapOutput();
   const server = await createRuntimeHttpServer();
