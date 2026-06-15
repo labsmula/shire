@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  CandidateAuthenticationConfigurationError,
   CandidateAuthenticationError,
   resolveCandidateIdentity,
 } from "@/lib/server/candidate-identity";
@@ -49,6 +50,12 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    if (error instanceof CandidateAuthenticationConfigurationError) {
+      return NextResponse.json(
+        { error: "authentication-configuration-error" },
+        { status: 500 },
+      );
+    }
     if (error instanceof CandidateAuthenticationError) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
