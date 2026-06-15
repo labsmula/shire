@@ -171,7 +171,8 @@ test("one user can own candidate and recruiter profiles", async () => {
 Run:
 
 ```powershell
-node --import tsx --test apps/web/test/profile-repository.test.ts
+Set-Location apps/web
+node --import tsx --test test/profile-repository.test.ts
 ```
 
 Expected: FAIL because the new modules do not exist.
@@ -250,7 +251,8 @@ Throw typed repository errors instead of returning partial data.
 Run:
 
 ```powershell
-node --import tsx --test apps/web/test/profile-repository.test.ts apps/web/test/cv-route.test.ts
+Set-Location apps/web
+node --import tsx --test test/profile-repository.test.ts test/cv-route.test.ts
 npm.cmd run typecheck --workspace=@shire/web
 ```
 
