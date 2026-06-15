@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Persist candidate and recruiter profiles by verified Privy identity, activate roles from saved profiles, and isolate Mastra chat memory by user, role, and resource.
+**Goal:** Persist candidate and recruiter profiles by verified Privy identity in hosted Postgres, activate roles from saved profiles, and isolate Mastra chat memory by user, role, and resource.
 
-**Architecture:** Next.js API routes verify Privy access tokens and use a server-only Supabase secret client. The browser sends only a requested role/resource and messages; the chat proxy resolves the user, verifies the role profile, rebuilds trusted scope and memory keys, and forwards the request to the agent with the internal service token. Mastra keeps message history in thread-specific keys and role-specific resource memory.
+**Architecture:** Next.js API routes verify Privy access tokens and query hosted Postgres through server-only Drizzle ORM. The browser sends only a requested role/resource and messages; the chat proxy resolves the user, verifies the role profile, rebuilds trusted scope and memory keys, and forwards the request to the agent with the internal service token. Mastra keeps message history in thread-specific keys and role-specific resource memory.
 
-**Tech Stack:** Next.js App Router, Privy React/Node SDKs, Supabase Postgres and `@supabase/supabase-js`, Zod, Assistant UI AI SDK transport, Mastra Memory, Node test runner.
+**Tech Stack:** Next.js App Router, Privy React/Node SDKs, Neon/PostgreSQL, Drizzle ORM, postgres.js, Drizzle Kit, Zod, Assistant UI AI SDK transport, Mastra Memory, Node test runner.
 
 ---
 
@@ -15,145 +15,109 @@
 New focused modules:
 
 - `apps/web/lib/server/authenticated-user.ts`: Privy token verification and demo-mode identity.
-- `apps/web/lib/server/supabase-admin.ts`: server-only Supabase client creation.
+- `apps/web/lib/server/db/index.ts`: lazy server-only Drizzle connection.
+- `apps/web/lib/server/db/schema.ts`: typed Postgres schema.
 - `apps/web/lib/server/profile-repository.ts`: user and role-profile persistence contract.
 - `apps/web/lib/profile-client.ts`: authenticated browser profile API client.
 - `apps/web/lib/chat/server-scope.ts`: server-owned role authorization, thread keys, and trusted context.
 - `apps/web/app/api/profiles/candidate/route.ts`: candidate profile GET/PUT.
 - `apps/web/app/api/profiles/recruiter/route.ts`: recruiter profile GET/PUT.
-- `supabase/migrations/*_privy_role_profiles.sql`: schema, indexes, timestamps, and RLS.
+- `apps/web/drizzle/*_privy_role_profiles.sql`: Drizzle migration, timestamps, and RLS.
 
 Existing files remain responsible for presentation, demo cache, and agent runtime concerns.
 
 ---
 
-### Task 1: Bootstrap Supabase and Profile Schema
+### Task 1: Bootstrap Drizzle and Profile Schema
 
 **Files:**
-- Create through CLI: `supabase/config.toml`
-- Create through CLI: `supabase/migrations/*_privy_role_profiles.sql`
-- Modify: `.gitignore`
+- Create: `apps/web/drizzle.config.ts`
+- Create: `apps/web/drizzle.migrate.config.ts`
+- Create: `apps/web/lib/server/db/schema.ts`
+- Create through Drizzle Kit: `apps/web/drizzle/*`
 - Modify: `apps/web/package.json`
 - Modify: `apps/web/.env.example`
 - Modify: `package-lock.json`
 
-- [ ] **Step 1: Discover and initialize the Supabase CLI**
+- [ ] **Step 1: Install Drizzle and the Postgres driver**
 
 Run:
 
 ```powershell
-npx supabase --help
-npx supabase init
-npx supabase migration new privy_role_profiles
+npm.cmd uninstall @supabase/supabase-js --workspace=@shire/web
+npm.cmd install drizzle-orm postgres --workspace=@shire/web
+npm.cmd install -D drizzle-kit --workspace=@shire/web
 ```
 
-Expected: `supabase/config.toml` exists and the migration command prints the exact generated migration path. Use that generated path; do not invent a timestamped filename.
+Expected: the native Supabase JavaScript client is absent and Drizzle packages
+are present in the web workspace.
 
-- [ ] **Step 2: Install the server database client**
+- [ ] **Step 2: Define the typed schema**
 
-Run:
+Define `appUsers`, `candidateProfiles`, and `recruiterProfiles` in
+`apps/web/lib/server/db/schema.ts` with Drizzle's PostgreSQL schema API. Use
+UUID primary keys, a unique Privy ID, JSONB profiles, timezone-aware timestamps,
+and cascading foreign keys.
 
-```powershell
-npm.cmd install @supabase/supabase-js --workspace=@shire/web
+- [ ] **Step 3: Configure Drizzle Kit**
+
+`apps/web/drizzle.config.ts` is offline and used only for schema generation:
+
+```ts
+export default defineConfig({
+  schema: "./lib/server/db/schema.ts",
+  out: "./drizzle",
+  dialect: "postgresql",
+});
 ```
 
-Expected: `@supabase/supabase-js` appears in `apps/web/package.json` and the lockfile changes.
+`apps/web/drizzle.migrate.config.ts` uses the same schema/output and fails at
+config load when `DIRECT_DATABASE_URL` is absent.
 
-- [ ] **Step 3: Write the migration**
+Add workspace scripts:
 
-In the generated `*_privy_role_profiles.sql`, create:
-
-```sql
-create extension if not exists pgcrypto;
-
-create table public.app_users (
-  id uuid primary key default gen_random_uuid(),
-  privy_user_id text not null unique,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table public.candidate_profiles (
-  user_id uuid primary key references public.app_users(id) on delete cascade,
-  profile jsonb not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table public.recruiter_profiles (
-  user_id uuid primary key references public.app_users(id) on delete cascade,
-  profile jsonb not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
-create trigger app_users_set_updated_at
-before update on public.app_users
-for each row execute function public.set_updated_at();
-
-create trigger candidate_profiles_set_updated_at
-before update on public.candidate_profiles
-for each row execute function public.set_updated_at();
-
-create trigger recruiter_profiles_set_updated_at
-before update on public.recruiter_profiles
-for each row execute function public.set_updated_at();
-
-alter table public.app_users enable row level security;
-alter table public.candidate_profiles enable row level security;
-alter table public.recruiter_profiles enable row level security;
-
-revoke all on public.app_users from anon, authenticated;
-revoke all on public.candidate_profiles from anon, authenticated;
-revoke all on public.recruiter_profiles from anon, authenticated;
+```json
+"db:generate": "node --env-file-if-exists=.env ../../node_modules/drizzle-kit/bin.cjs generate --config=drizzle.config.ts",
+"db:migrate": "node --env-file-if-exists=.env ../../node_modules/drizzle-kit/bin.cjs migrate --config=drizzle.migrate.config.ts"
 ```
 
-Do not create browser policies. The server secret client is the only database caller.
+- [ ] **Step 4: Generate and secure the initial migration**
 
-- [ ] **Step 4: Document server-only environment variables**
+Run `npm run db:generate --workspace=@shire/web -- --name=privy_role_profiles`.
+The resulting Drizzle migration is the only migration source. Extend it with
+the safe `updated_at` function/triggers, RLS enablement, and revokes from
+`anon` and `authenticated`. Do not create browser policies.
+
+- [ ] **Step 5: Document server-only environment variables**
 
 Add to `apps/web/.env.example`:
 
 ```env
-# Supabase server access. Never prefix the secret key with NEXT_PUBLIC_.
-SUPABASE_URL=
-SUPABASE_SECRET_KEY=
+# Hosted Postgres. Never prefix database URLs with NEXT_PUBLIC_.
+# Pooled URL for runtime queries; postgres.js uses prepare: false.
+DATABASE_URL=
+# Direct/unpooled URL used only by Drizzle Kit migrations.
+DIRECT_DATABASE_URL=
 ```
 
-Add local Supabase state directories, but not migrations/config, to `.gitignore`:
-
-```gitignore
-supabase/.branches/
-supabase/.temp/
-```
-
-- [ ] **Step 5: Validate local migration metadata**
+- [ ] **Step 6: Validate generated metadata**
 
 Run:
 
 ```powershell
-npx supabase migration list --local
+npm.cmd run db:generate --workspace=@shire/web
+npm.cmd run typecheck --workspace=@shire/web
 git diff --check
 ```
 
-Expected: the new migration is listed and the diff has no whitespace errors. If no local Supabase runtime is available, record that database application remains pending but continue with repository tests.
+Expected: Drizzle reports no new schema changes, typecheck passes, and the diff
+has no whitespace errors.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```powershell
-git add -- .gitignore apps/web/package.json apps/web/.env.example package-lock.json supabase/config.toml supabase/migrations
-git commit -m "feat(db): add Privy role profile schema"
+git add -- apps/web/package.json apps/web/.env.example apps/web/drizzle.config.ts apps/web/drizzle.migrate.config.ts apps/web/lib/server/db/schema.ts apps/web/drizzle package-lock.json
+git commit -m "refactor(db): use Drizzle for Supabase Postgres"
 ```
 
 ---
@@ -162,7 +126,7 @@ git commit -m "feat(db): add Privy role profile schema"
 
 **Files:**
 - Create: `apps/web/lib/server/authenticated-user.ts`
-- Create: `apps/web/lib/server/supabase-admin.ts`
+- Create: `apps/web/lib/server/db/index.ts`
 - Create: `apps/web/lib/server/profile-repository.ts`
 - Create: `apps/web/test/profile-repository.test.ts`
 - Modify: `apps/web/lib/server/candidate-identity.ts`
@@ -240,24 +204,23 @@ Keep `candidate-identity.ts` as a compatibility wrapper that returns
 `resolveAuthenticatedUser(request).privyUserId`, then update CV tests to expect
 the verified Privy ID or `demo-user`.
 
-- [ ] **Step 4: Implement Supabase admin client**
+- [ ] **Step 4: Implement the lazy Drizzle connection**
 
-`supabase-admin.ts` exports a lazy server-only factory:
+`db/index.ts` exports a lazy server-only factory:
 
 ```ts
-export function createSupabaseAdmin() {
-  const url = process.env.SUPABASE_URL?.trim();
-  const secretKey = process.env.SUPABASE_SECRET_KEY?.trim();
-  if (!url || !secretKey) {
+export function createDatabase() {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) {
     throw new DatabaseConfigurationError();
   }
-  return createClient(url, secretKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const client = postgres(url, { prepare: false });
+  return drizzle(client, { schema });
 }
 ```
 
-Do not instantiate the client at module import time because tests and builds may not have production credentials.
+Do not connect at module import time because tests and builds may not have
+production credentials.
 
 - [ ] **Step 5: Implement repository interface and Supabase adapter**
 
@@ -278,9 +241,9 @@ export interface ProfileRepository {
 }
 ```
 
-The Supabase adapter uses `upsert(..., { onConflict: "privy_user_id" })` for
-users and `upsert(..., { onConflict: "user_id" })` for profiles. Throw typed
-repository errors instead of returning partial data.
+The Drizzle adapter uses `onConflictDoUpdate` for users and role profiles.
+Resolve the user and profile writes transactionally where a route needs both.
+Throw typed repository errors instead of returning partial data.
 
 - [ ] **Step 6: Run focused and existing CV tests**
 
@@ -296,7 +259,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```powershell
-git add -- apps/web/lib/server/authenticated-user.ts apps/web/lib/server/supabase-admin.ts apps/web/lib/server/profile-repository.ts apps/web/lib/server/candidate-identity.ts apps/web/test/profile-repository.test.ts apps/web/test/cv-route.test.ts
+git add -- apps/web/lib/server/authenticated-user.ts apps/web/lib/server/db/index.ts apps/web/lib/server/profile-repository.ts apps/web/lib/server/candidate-identity.ts apps/web/test/profile-repository.test.ts apps/web/test/cv-route.test.ts
 git commit -m "feat(web): resolve Privy users and role profiles"
 ```
 
@@ -869,7 +832,7 @@ git commit -m "feat(web): gate role switching by saved profiles"
 
 Document:
 
-- Required `SUPABASE_URL` and `SUPABASE_SECRET_KEY`.
+- Required `DATABASE_URL` and `DIRECT_DATABASE_URL`.
 - Same `SHIRE_AGENT_SERVICE_TOKEN` in web and agent.
 - Privy app ID/secret requirements.
 - One Privy login can own two role profiles.
@@ -878,9 +841,12 @@ Document:
 
 - [ ] **Step 2: Apply and verify the migration**
 
-Use the configured Supabase project. Prefer Supabase MCP `execute_sql` and
-advisors when available; otherwise use current CLI commands discovered through
-`--help`.
+Run the checked-in Drizzle migration against the configured hosted Postgres
+project:
+
+```powershell
+npm.cmd run db:migrate --workspace=@shire/web
+```
 
 Verify:
 

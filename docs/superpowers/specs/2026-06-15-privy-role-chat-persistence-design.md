@@ -3,7 +3,7 @@
 ## Goal
 
 Make Privy the authoritative user identity for Shire, persist candidate and
-recruiter profiles in Supabase, and isolate assistant history by authenticated
+recruiter profiles in hosted Postgres, and isolate assistant history by authenticated
 user, active role, and page resource.
 
 This removes the current hard-coded `candidate-001` and `recruiter-001`
@@ -19,7 +19,7 @@ This feature includes:
 - Role activation only after the corresponding profile is saved.
 - Server-generated chat scope, thread, and memory resource identifiers.
 - Trusted profile context for identity-aware assistant responses.
-- Supabase migrations and server-only data access.
+- Drizzle schema, migrations, and server-only Postgres data access.
 - Migration of candidate and recruiter form persistence from Zustand to APIs.
 
 This feature does not migrate jobs, applications, stakes, disputes, or
@@ -60,7 +60,9 @@ only a cache for rendering and demo-only data.
 
 ## Database Schema
 
-Supabase Postgres stores three profile-domain tables.
+Hosted Postgres (currently Neon) stores three profile-domain tables. Drizzle ORM is
+the source of truth for the TypeScript schema, SQL migrations, and server
+queries.
 
 ### `app_users`
 
@@ -101,9 +103,13 @@ Indexes:
 - Primary-key indexes cover profile lookup by `user_id`.
 
 All tables have RLS enabled. No `anon` or `authenticated` browser policies are
-created because Shire does not use Supabase Auth. Next.js server routes use a
-server-only Supabase secret key after Privy authorization. The secret key is
-never exposed through a `NEXT_PUBLIC_` variable.
+created because Shire does not use Supabase Auth. Next.js server routes connect
+directly to Postgres through Drizzle after Privy authorization. Database URLs
+are server-only and are never exposed through a `NEXT_PUBLIC_` variable.
+
+Runtime queries use the provider's pooled URL with prepared statements
+disabled. Drizzle Kit migrations use a direct/unpooled URL so schema
+changes are not run through transaction-pool limitations.
 
 ## Server Authentication
 
@@ -251,7 +257,7 @@ role is inactive and the chat request is rejected rather than guessed.
 ## Security Rules
 
 - Never trust identity or memory keys supplied by the browser.
-- Never expose the Supabase secret key or agent service token to the browser.
+- Never expose database URLs or the agent service token to the browser.
 - Verify Privy tokens on every protected profile, CV, and chat request.
 - Validate requested role against persisted profiles.
 - Validate all profile writes with Zod.
@@ -269,7 +275,7 @@ Stable API errors:
 - `403 resource-forbidden`: role cannot access the requested resource.
 - `404 profile-not-found`: role onboarding has not been completed.
 - `400 invalid-profile`: profile payload failed schema validation.
-- `500 missing-database-configuration`: required Supabase server config absent.
+- `500 missing-database-configuration`: required Postgres URL absent.
 - `502 agent-unreachable`: authenticated request could not reach the agent.
 
 The UI should direct `role-not-active` and `profile-not-found` users to the
@@ -309,7 +315,7 @@ Database verification covers:
 - Migration applies cleanly.
 - RLS is enabled.
 - Public roles cannot read or write profile tables.
-- Server secret client can upsert and retrieve both role profiles.
+- Drizzle can transact, upsert, and retrieve both role profiles.
 
 An end-to-end manual check uses two Privy accounts and both roles to confirm
 that names and chat histories do not cross user or role boundaries.
