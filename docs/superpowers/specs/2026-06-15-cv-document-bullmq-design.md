@@ -253,7 +253,7 @@ Agent development dependency:
 
 Web runtime dependency:
 
-- `@privy-io/server-auth`
+- `@privy-io/node`
 
 ## Testing Strategy
 

@@ -6,7 +6,7 @@
 
 **Architecture:** The web app authenticates the candidate and proxies multipart uploads to the internal agent. The agent extracts bounded text in memory and enqueues the existing typed `cv-parse` payload through a BullMQ adapter. Processor logic remains queue-neutral, while BullMQ owns persistence, retry timing, state polling, and graceful shutdown.
 
-**Tech Stack:** TypeScript, Next.js route handlers, Express, BullMQ, Redis, Multer, pdf-parse, Mammoth, Privy server auth, Node test runner.
+**Tech Stack:** TypeScript, Next.js route handlers, Express, BullMQ, Redis, Multer, pdf-parse, Mammoth, Privy Node SDK, Node test runner.
 
 ---
 
