@@ -27,6 +27,7 @@ export async function normalizeCvWithFallback(input: {
   }) => Promise<CvGenerationResult>;
 }) {
   const attempts: Array<{ tier: CvNormalizationTier; error?: string }> = [];
+  let lastError: unknown;
 
   for (const tier of ["cheap", "cheap", "balanced"] as const) {
     try {
@@ -34,6 +35,7 @@ export async function normalizeCvWithFallback(input: {
       const profile = CandidateProfileDraftSchema.parse(result.profile);
       return { profile, result, attempts };
     } catch (error) {
+      lastError = error;
       attempts.push({
         tier,
         error:
@@ -44,7 +46,9 @@ export async function normalizeCvWithFallback(input: {
     }
   }
 
-  throw new Error(`CV normalization exhausted ${attempts.length} attempts`);
+  throw new Error(`CV normalization exhausted ${attempts.length} attempts`, {
+    cause: lastError,
+  });
 }
 
 export function sanitizeCvText(rawCv: string) {

@@ -37,6 +37,8 @@ await Promise.all([
   import("./cv-agent-generator.test"),
   import("./cv-parse-processor.test"),
   import("./cv-document.test"),
+  import("./job-errors.test"),
+  import("./bullmq-job-queue.test"),
   import("./agent-worker.test"),
   import("./jobs-http.test"),
   import("./live-cv-worker.test"),
