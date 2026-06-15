@@ -45,6 +45,79 @@ CV extraction produces a Zod-validated draft. Embedding is a separate
 TokenRouter request resolved by Mastra over canonical profile search text. Raw
 CV text and full evidence files are excluded from memory.
 
+## Background worker
+
+The runtime starts a persistent in-memory worker by default. This is the
+queue-neutral validation phase before Redis and BullMQ are introduced.
+
+Start the service:
+
+```bash
+npm run dev --workspace=@shire/agent
+```
+
+Submit a deterministic job:
+
+```http
+POST http://localhost:3010/jobs
+Content-Type: application/json
+
+{
+  "name": "onchain-sync",
+  "payload": {
+    "chain": "Celo"
+  }
+}
+```
+
+Submit an LLM-backed CV job:
+
+```http
+POST http://localhost:3010/jobs
+Content-Type: application/json
+
+{
+  "name": "cv-parse",
+  "payload": {
+    "candidateId": "candidate-001",
+    "rawCv": "Maya Okafor. Senior frontend engineer with TypeScript and React experience."
+  }
+}
+```
+
+Both requests return `202` with a `jobId`. Poll:
+
+```http
+GET http://localhost:3010/jobs/{jobId}
+```
+
+The status transitions through `queued`, `active`, then `completed` or
+`failed`. `onchain-sync` returns `llmInvoked: false`; `cv-parse` returns
+`llmInvoked: true`, model usage, and embedding dimensions after successful
+provider calls.
+
+Run the CV CLI path directly:
+
+```bash
+npm run job:cv-parse --workspace=@shire/agent
+```
+
+This command now uses the real CV processor. It requires a valid
+`OPENROUTER_API_KEY` and fails instead of reporting fixture usage when the LLM
+or embedding provider is unavailable.
+
+The live worker test is opt-in:
+
+```powershell
+$env:SHIRE_LIVE_LLM_TESTS="true"
+node --env-file-if-exists=.env --import tsx --test test/live-cv-worker.test.ts
+```
+
+Keep `SHIRE_LIVE_LLM_TESTS=false` in normal unit-test runs. A `401` indicates a
+missing or invalid provider key; `402` or `429` indicates provider credit or
+rate limiting; structured-output failures indicate the selected model could not
+produce the candidate schema.
+
 Run `npm run job:knowledge-sync --workspace=@shire/agent` to index the approved
 repository manifest. Job results expose routing metadata plus normalized model,
 provider, token, latency, retry, and escalation fields.

@@ -19,6 +19,15 @@ import { validateChatRequest } from "./runtime/chat-validation";
 import { createInMemoryRateLimiter, type RateLimiter } from "./runtime/rate-limit";
 import { guardSecurityPrompt } from "./runtime/security-guard";
 import { evaluateSecurityPolicy } from "./runtime/security-policy";
+import { AgentWorker } from "./runtime/jobs/agent-worker";
+import { parseJobRequest } from "./runtime/jobs/job-contracts";
+import type {
+  JobResult,
+  ProcessableJob,
+} from "./runtime/jobs/job-contracts";
+import { InMemoryJobQueue } from "./runtime/jobs/in-memory-job-queue";
+import type { JobQueue } from "./runtime/jobs/job-queue";
+import { createJobProcessors } from "./runtime/jobs/job-processors";
 
 const runtimeLogger = logger.child({ component: "runtime" });
 
@@ -28,6 +37,11 @@ export type RuntimeHttpServerDependencies = {
   now?: () => number;
   securityIndicatorClassifier?: typeof classifySecurityIndicator;
   securityGuard?: typeof guardSecurityPrompt;
+  jobQueue?: JobQueue;
+  processJob?: (
+    job: ProcessableJob,
+    context: { attempt: number; signal: AbortSignal },
+  ) => Promise<JobResult>;
 };
 
 export function getRuntimeBootstrapOutput() {
@@ -44,6 +58,41 @@ export async function createRuntimeHttpServer(
 ): Promise<Server> {
   const app = express();
   app.use(express.json());
+  const jobQueue = dependencies.jobQueue ?? new InMemoryJobQueue();
+  const processors = createJobProcessors();
+  const worker = new AgentWorker({
+    queue: jobQueue,
+    process: dependencies.processJob ?? processors.process,
+  });
+  if (env.workerEnabled) {
+    worker.start();
+  }
+
+  app.post("/jobs", async (request, response) => {
+    try {
+      const parsed = parseJobRequest(request.body);
+      const job = await jobQueue.enqueue(parsed);
+      runtimeLogger.info(
+        { jobId: job.id, jobName: job.name },
+        "job queued",
+      );
+      response.status(202).json({ jobId: job.id, status: job.status });
+    } catch {
+      response.status(400).json({
+        status: "invalid-job-request",
+        message: "Job name or payload is invalid.",
+      });
+    }
+  });
+
+  app.get("/jobs/:jobId", async (request, response) => {
+    const job = await jobQueue.get(request.params.jobId);
+    if (!job) {
+      response.status(404).json({ status: "not-found" });
+      return;
+    }
+    response.json(job);
+  });
 
   app.use("/chat/:agentId", (request, response, next) => {
     const startedAt = Date.now();
@@ -278,7 +327,7 @@ export async function createRuntimeHttpServer(
 
   runtimeLogger.info(
     {
-      routes: ["/health", "/ready", "/chat/:agentId"],
+      routes: ["/health", "/ready", "/jobs", "/jobs/:jobId", "/chat/:agentId"],
     },
     "runtime http routes ready",
   );
@@ -290,7 +339,13 @@ export async function createRuntimeHttpServer(
     });
   });
 
-  return createServer(app);
+  const httpServer = createServer(app);
+  httpServer.on("close", () => {
+    if (env.workerEnabled) {
+      void worker.close();
+    }
+  });
+  return httpServer;
 }
 
 export async function runServer(argv: readonly string[] = process.argv.slice(2)) {
