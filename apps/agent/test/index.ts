@@ -36,6 +36,7 @@ await Promise.all([
   import("./job-processors.test"),
   import("./cv-agent-generator.test"),
   import("./cv-parse-processor.test"),
+  import("./cv-document.test"),
   import("./agent-worker.test"),
   import("./jobs-http.test"),
   import("./live-cv-worker.test"),
