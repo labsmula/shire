@@ -47,8 +47,8 @@ CV text and full evidence files are excluded from memory.
 
 ## Background worker
 
-The runtime starts a persistent in-memory worker by default. This is the
-queue-neutral validation phase before Redis and BullMQ are introduced.
+The service starts the HTTP listener and BullMQ worker in the same process.
+Redis persists queued jobs, retry state, and results across service restarts.
 
 Start the service:
 
@@ -137,7 +137,8 @@ Start the HTTP listener and worker:
 npm run dev --workspace=@shire/agent
 ```
 
-`job:cv-parse` remains a one-shot CLI command.
+Do not start a separate worker command. `job:cv-parse` remains a one-shot CLI
+command for direct testing, so it exits after printing the result.
 
 Upload a PDF or DOCX CV with Postman:
 
