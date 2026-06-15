@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import * as React from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -39,7 +40,13 @@ const ROLES = [
 const LANGS = ["English", "Spanish", "Indonesian", "Hindi", "German"];
 const EXPERIENCE = ["INTERN", "JUNIOR", "MID", "SENIOR", "LEAD"] as const;
 
-export function CandidateProfileForm({ redirectTo }: { redirectTo?: string }) {
+export function CandidateProfileForm({
+  redirectTo,
+  draft,
+}: {
+  redirectTo?: string;
+  draft?: CandidateProfileValues | null;
+}) {
   const router = useRouter();
   const existing = useShireStore((s) => s.candidateProfile);
   const save = useShireStore((s) => s.saveCandidateProfile);
@@ -64,6 +71,12 @@ export function CandidateProfileForm({ redirectTo }: { redirectTo?: string }) {
       visibility: existing?.visibility ?? "PUBLIC",
     },
   });
+
+  React.useEffect(() => {
+    if (draft) {
+      form.reset(draft);
+    }
+  }, [draft, form]);
 
   function onSubmit(values: CandidateProfileValues) {
     save({
@@ -276,7 +289,7 @@ export function CandidateProfileForm({ redirectTo }: { redirectTo?: string }) {
 
         <div className="flex justify-end gap-2">
           <Button type="submit" size="lg">
-            Save profile
+            Confirm & Save
           </Button>
         </div>
       </form>

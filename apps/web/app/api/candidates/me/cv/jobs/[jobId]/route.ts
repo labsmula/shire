@@ -22,11 +22,14 @@ export async function GET(
     );
   }
 
+  let stage = "authenticate";
   try {
     const candidateId = await resolveCandidateIdentity(request);
+    stage = "resolve-job";
     const { jobId } = await context.params;
     const url = new URL(`${agentUrl}/jobs/${encodeURIComponent(jobId)}`);
     url.searchParams.set("candidateId", candidateId);
+    stage = "forward-agent";
     const upstream = await fetch(url, {
       headers: { authorization: `Bearer ${serviceToken}` },
     });
@@ -41,6 +44,10 @@ export async function GET(
     if (error instanceof CandidateAuthenticationError) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+    console.error("[shire-web:cv-status-proxy] request failed", {
+      stage,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json({ error: "agent-unreachable" }, { status: 502 });
   }
 }

@@ -22,8 +22,10 @@ export async function POST(request: Request) {
     );
   }
 
+  let stage = "authenticate";
   try {
     const candidateId = await resolveCandidateIdentity(request);
+    stage = "parse-form";
     const incoming = await request.formData();
     const file = incoming.get("file");
     if (!(file instanceof File)) {
@@ -33,6 +35,7 @@ export async function POST(request: Request) {
     const upstreamBody = new FormData();
     upstreamBody.set("candidateId", candidateId);
     upstreamBody.set("file", file, file.name);
+    stage = "forward-agent";
     const upstream = await fetch(`${config.url}/jobs/cv-document`, {
       method: "POST",
       headers: { authorization: `Bearer ${config.token}` },
@@ -49,6 +52,10 @@ export async function POST(request: Request) {
     if (error instanceof CandidateAuthenticationError) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+    console.error("[shire-web:cv-proxy] request failed", {
+      stage,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json({ error: "agent-unreachable" }, { status: 502 });
   }
 }
