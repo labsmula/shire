@@ -118,6 +118,70 @@ missing or invalid provider key; `402` or `429` indicates provider credit or
 rate limiting; structured-output failures indicate the selected model could not
 produce the candidate schema.
 
+## Durable CV document processing
+
+The long-running service uses BullMQ with external Redis:
+
+```env
+REDIS_URL=rediss://user:password@redis.example.com:6379
+SHIRE_AGENT_SERVICE_TOKEN=replace-with-a-long-random-secret
+SHIRE_JOB_QUEUE_NAME=shire-agent-jobs
+SHIRE_JOB_ATTEMPTS=3
+SHIRE_JOB_BACKOFF_MS=5000
+SHIRE_CV_MAX_FILE_BYTES=5242880
+```
+
+Start the HTTP listener and worker:
+
+```powershell
+npm run dev --workspace=@shire/agent
+```
+
+`job:cv-parse` remains a one-shot CLI command.
+
+Upload a PDF or DOCX CV with Postman:
+
+```http
+POST http://localhost:3010/jobs/cv-document
+Authorization: Bearer <SHIRE_AGENT_SERVICE_TOKEN>
+Content-Type: multipart/form-data
+```
+
+Form fields:
+
+- `candidateId`: candidate identifier resolved by the web backend
+- `file`: one PDF or DOCX file, maximum 5 MiB
+
+Poll the returned job:
+
+```http
+GET http://localhost:3010/jobs/{jobId}?candidateId={candidateId}
+Authorization: Bearer <SHIRE_AGENT_SERVICE_TOKEN>
+```
+
+Temporary provider failures such as HTTP `429`, `5xx`, timeouts, and connection
+errors run at most three times with exponential backoff starting at five
+seconds. Invalid documents and permanent validation failures do not retry.
+
+Verify the real external Redis retry path:
+
+```powershell
+npm run test:live-queue --workspace=@shire/agent
+```
+
+The integration test is skipped when `REDIS_URL` is not configured.
+
+Browsers use the web proxy instead of calling the agent directly:
+
+```http
+POST /api/candidates/me/cv
+GET /api/candidates/me/cv/jobs/{jobId}
+```
+
+The web server derives `candidateId` from verified Privy identity in production
+or `me_candidate` in demo mode, then authenticates to the agent with the shared
+server-only service token.
+
 Run `npm run job:knowledge-sync --workspace=@shire/agent` to index the approved
 repository manifest. Job results expose routing metadata plus normalized model,
 provider, token, latency, retry, and escalation fields.
