@@ -164,3 +164,35 @@ test("accepts authenticated CV documents and enforces status ownership", async (
     await once(server, "close");
   }
 });
+
+test("returns 503 when durable job status is unavailable", async () => {
+  const runtime: DurableJobRuntime = {
+    async enqueue() {
+      throw new Error("unused");
+    },
+    async get() {
+      throw new Error("redis unavailable");
+    },
+    async start() {},
+    async close() {},
+  };
+  const server = await createRuntimeHttpServer({
+    durableJobRuntime: runtime,
+    serviceToken: "service-secret",
+  });
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/jobs/job-1?candidateId=candidate-1`,
+      { headers: { authorization: "Bearer service-secret" } },
+    );
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { status: "queue-unavailable" });
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});

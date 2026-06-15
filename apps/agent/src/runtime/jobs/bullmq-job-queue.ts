@@ -19,6 +19,7 @@ type BullJobLike = {
   name: string;
   data: JobRequest;
   attemptsMade: number;
+  delay?: number;
   opts: { attempts?: number; delay?: number };
   timestamp: number;
   processedOn?: number;
@@ -63,8 +64,11 @@ export async function mapBullJobEnvelope(
   const state = await job.getState();
   const status = mapStatus(state);
   const nextRetryAt =
-    status === "delayed" && job.opts.delay
-      ? new Date(job.timestamp + job.opts.delay).toISOString()
+    status === "delayed" && (job.delay ?? job.opts.delay)
+      ? new Date(
+          (job.processedOn ?? job.timestamp) +
+            (job.delay ?? job.opts.delay ?? 0),
+        ).toISOString()
       : undefined;
 
   return {

@@ -26,6 +26,7 @@ test("maps delayed BullMQ jobs with ownership and retry metadata", async () => {
       },
       attemptsMade: 1,
       opts: { attempts: 3, delay: 5_000 },
+      delay: 5_000,
       timestamp: 1_000,
       processedOn: 2_000,
       returnvalue: null,
@@ -38,7 +39,7 @@ test("maps delayed BullMQ jobs with ownership and retry metadata", async () => {
   assert.equal(envelope?.status, "delayed");
   assert.equal(envelope?.attempts, 1);
   assert.equal(envelope?.maxAttempts, 3);
-  assert.equal(envelope?.nextRetryAt, new Date(6_000).toISOString());
+  assert.equal(envelope?.nextRetryAt, new Date(7_000).toISOString());
   assert.equal(
     await mapBullJobEnvelope(
       {

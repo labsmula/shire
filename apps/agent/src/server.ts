@@ -199,9 +199,19 @@ export async function createRuntimeHttpServer(
       response.status(401).json({ status: "unauthorized" });
       return;
     }
-    const job = durableJobRuntime
-      ? await durableJobRuntime.get(request.params.jobId, candidateId)
-      : await jobQueue!.get(request.params.jobId);
+    let job;
+    try {
+      job = durableJobRuntime
+        ? await durableJobRuntime.get(request.params.jobId, candidateId)
+        : await jobQueue!.get(request.params.jobId);
+    } catch (error) {
+      runtimeLogger.error(
+        { err: error, jobId: request.params.jobId },
+        "job status lookup failed",
+      );
+      response.status(503).json({ status: "queue-unavailable" });
+      return;
+    }
     if (
       job &&
       candidateId &&
