@@ -1,14 +1,88 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createAgentMemoryConfig } from "../src/runtime/memory";
+import { Memory } from "@mastra/memory";
+import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
 
-test("memory remains bounded and uses the configured libSQL store", () => {
-  const config = createAgentMemoryConfig({
-    agentMemoryUrl: "file:./.data/test-memory.db",
+process.env.TOKENROUTER_API_KEY ??= "test-tokenrouter-api-key";
+
+const [{ createEnv }, memoryModule] = await Promise.all([
+  import("../src/env"),
+  import("../src/runtime/memory"),
+]);
+
+const {
+  agentMemory,
+  agentMemoryTemplate,
+  buildAgentMemoryConfig,
+  createAgentMemory,
+  createAgentMemoryConfig,
+} = memoryModule;
+
+const runtime = {
+  ...createEnv({}),
+  agentMemoryUrl: "file:./.data/test-agent-memory.db",
+  agentKnowledgeUrl: "file:./.data/test-agent-knowledge.db",
+};
+
+test("agent memory config includes vector recall and working memory", () => {
+  const config = buildAgentMemoryConfig({
+    ...runtime,
+    embeddingEnabled: true,
+    workingMemoryEnabled: true,
   });
 
-  assert.equal(config.options.lastMessages, 10);
+  assert.ok(config.storage instanceof LibSQLStore);
+  assert.ok(config.vector instanceof LibSQLVector);
+  assert.equal(config.options.lastMessages, 20);
+  assert.deepEqual(config.options.semanticRecall, {
+    topK: 5,
+    messageRange: {
+      before: 2,
+      after: 1,
+    },
+    scope: "resource",
+  });
+
   assert.equal(config.options.workingMemory.enabled, true);
+  assert.equal(config.options.workingMemory.scope, "resource");
+  assert.equal(config.options.workingMemory.template, agentMemoryTemplate);
   assert.equal(config.options.generateTitle, false);
+  assert.equal(typeof config.embedder, "object");
+  assert.equal(typeof config.embedder.doEmbed, "function");
+  assert.equal(config.embedder.provider, "openrouter");
+  assert.equal(config.embedder.modelId, "qwen/qwen3-embedding-8b");
+
+  const aliasConfig = createAgentMemoryConfig({
+    ...runtime,
+    embeddingEnabled: true,
+    workingMemoryEnabled: true,
+  });
+  assert.ok(aliasConfig.storage instanceof LibSQLStore);
+  assert.ok(aliasConfig.vector instanceof LibSQLVector);
+  assert.equal(aliasConfig.options.generateTitle, config.options.generateTitle);
+  assert.equal(aliasConfig.embedder.provider, "openrouter");
+  assert.equal(aliasConfig.embedder.modelId, "qwen/qwen3-embedding-8b");
+});
+
+test("agent memory skips semantic recall when embeddings are disabled", () => {
+  const config = buildAgentMemoryConfig({
+    ...runtime,
+    embeddingEnabled: false,
+  });
+
+  assert.equal("vector" in config, false);
+  assert.equal("embedder" in config, false);
+  assert.equal(config.options.semanticRecall, false);
+  assert.equal(config.options.workingMemory, false);
+});
+
+test("agent memory factory returns a Memory instance", () => {
+  const memory = createAgentMemory(runtime);
+
+  assert.ok(memory instanceof Memory);
+});
+
+test("shared agent memory is created from the default runtime", () => {
+  assert.ok(agentMemory instanceof Memory);
 });

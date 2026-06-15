@@ -7,6 +7,7 @@ import {
 } from "../src/runtime/model-policy";
 import {
   createModelFallbackChain,
+  dynamicAgentModel,
   resolveRuntimeAgentModelId,
 } from "../src/runtime/model-router";
 
@@ -59,8 +60,21 @@ test("creates a Mastra fallback entry for each configured model", () => {
   );
 });
 
-test("uses Z.ai as the default chat model when workload is missing", () => {
+test("uses a verified free OpenRouter model when workload is missing", () => {
   const result = resolveRuntimeAgentModelId();
 
-  assert.equal(result, "zai/zai/glm-4.5-air");
+  assert.equal(result, "openrouter/nex-agi/nex-n2-pro:free");
+});
+
+test("provides the configured fallback chain to dynamic agents", () => {
+  const result = dynamicAgentModel({
+    requestContext: {
+      get: () => undefined,
+    },
+  });
+
+  assert.deepEqual(result, [
+    { model: "openrouter/nex-agi/nex-n2-pro:free", maxRetries: 1 },
+    { model: "openrouter/openai/gpt-oss-20b:free", maxRetries: 1 },
+  ]);
 });

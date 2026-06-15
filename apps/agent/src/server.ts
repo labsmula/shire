@@ -11,13 +11,23 @@ import {
   classifyChatRequest,
   createChatFallbackStream,
 } from "./runtime/chat-guard";
+import { classifySecurityIndicator } from "./runtime/security-indicators";
+import { enforceChatRateLimit } from "./runtime/chat-caller";
 import { searchProductKnowledge } from "./runtime/knowledge";
 import { enrichChatRequestWithProductKnowledge } from "./runtime/product-knowledge";
+import { validateChatRequest } from "./runtime/chat-validation";
+import { createInMemoryRateLimiter, type RateLimiter } from "./runtime/rate-limit";
+import { guardSecurityPrompt } from "./runtime/security-guard";
+import { evaluateSecurityPolicy } from "./runtime/security-policy";
 
 const runtimeLogger = logger.child({ component: "runtime" });
 
 export type RuntimeHttpServerDependencies = {
   searchProductKnowledge?: typeof searchProductKnowledge;
+  rateLimiter?: RateLimiter;
+  now?: () => number;
+  securityIndicatorClassifier?: typeof classifySecurityIndicator;
+  securityGuard?: typeof guardSecurityPrompt;
 };
 
 export function getRuntimeBootstrapOutput() {
@@ -85,6 +95,128 @@ export async function createRuntimeHttpServer(
     ) {
       next();
       return;
+    }
+
+    // Validate request
+    const validation = validateChatRequest(request.body, {
+      maxBodyBytes: env.chatMaxBodyBytes,
+      maxMessages: env.chatMaxMessages,
+      maxMessageCharacters: env.chatMaxMessageCharacters,
+    });
+
+    if (!validation.valid) {
+      runtimeLogger.warn(
+        {
+          agentId: request.params.agentId,
+          reasonCode: validation.reasonCode,
+        },
+        "chat request blocked by validation",
+      );
+
+      response
+        .status(200)
+        .set({
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+          "content-type": "text/event-stream; charset=utf-8",
+          "x-vercel-ai-ui-message-stream": "v1",
+        })
+        .send(
+          createChatFallbackStream({
+            decision: "out-of-scope",
+            messageLength: 0,
+          }),
+        );
+      return;
+    }
+
+    // Rate limit
+    const rateLimiter = dependencies.rateLimiter ?? createInMemoryRateLimiter();
+    const rateResult = await enforceChatRateLimit(
+      request.body,
+      {
+        rateLimiter,
+        now: dependencies.now,
+        ip: request.ip,
+      },
+      env.chatRateLimitRequests,
+      env.chatRateLimitWindowSeconds * 1000,
+    );
+
+    if (!rateResult.allowed) {
+      runtimeLogger.warn(
+        {
+          agentId: request.params.agentId,
+          callerKey: rateResult.callerKey,
+          retryAfterSeconds: rateResult.retryAfterSeconds,
+        },
+        "chat request rate limited",
+      );
+
+      response
+        .status(429)
+        .set({
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+          "content-type": "text/event-stream; charset=utf-8",
+          "x-vercel-ai-ui-message-stream": "v1",
+          "retry-after": rateResult.retryAfterSeconds.toString(),
+        })
+        .send(
+          createChatFallbackStream({
+            decision: "out-of-scope",
+            messageLength: 0,
+          }),
+        );
+      return;
+    }
+
+    const securityIndicatorClassifier =
+      dependencies.securityIndicatorClassifier ?? classifySecurityIndicator;
+    const securityGuard = dependencies.securityGuard ?? guardSecurityPrompt;
+    const existingSecurityIndicator = securityIndicatorClassifier(request.body);
+    if (existingSecurityIndicator.level === "suspicious") {
+      try {
+        const securityGuardDecision = securityGuard(request.body);
+        const securityPolicyDecision = evaluateSecurityPolicy(securityGuardDecision);
+
+        if (securityPolicyDecision.decision === "block") {
+          runtimeLogger.warn(
+            {
+              agentId: request.params.agentId,
+              risk: securityGuardDecision.risk,
+              category: securityGuardDecision.category,
+              reasonCode: securityGuardDecision.reasonCode,
+              detectedLanguage: securityGuardDecision.detectedLanguage,
+            },
+            "chat request blocked by security guard",
+          );
+
+          response
+            .status(200)
+            .set({
+              "cache-control": "no-cache",
+              connection: "keep-alive",
+              "content-type": "text/event-stream; charset=utf-8",
+              "x-vercel-ai-ui-message-stream": "v1",
+            })
+            .send(
+              createChatFallbackStream({
+                decision: "prompt-injection",
+                messageLength: securityGuardDecision.text.length,
+              }),
+            );
+          return;
+        }
+      } catch (error) {
+        runtimeLogger.warn(
+          {
+            agentId: request.params.agentId,
+            err: error,
+          },
+          "security guard unavailable, continuing with fallback policy",
+        );
+      }
     }
 
     const decision = classifyChatRequest(request.body);
