@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# Env files (injected by Railway)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local data / SQLite
+**/.data
+**/*.db
+**/*.db-shm
+**/*.db-wal
+
+# Dependencies (reinstalled in Docker)
+**/node_modules
+
+# Build outputs
+apps/agent/dist
+apps/web/.next
+
+# Docs & non-essential
+docs
+contracts
+.agent
+.claude
+render.yaml
+
+# OS
+.DS_Store
+Thumbs.db

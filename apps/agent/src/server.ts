@@ -578,7 +578,9 @@ export async function startRuntimeService() {
   void mastra;
 
   if (!env.redisUrl) {
-    throw new Error("REDIS_URL is required to start the agent service.");
+    runtimeLogger.warn(
+      "REDIS_URL is not set — falling back to in-memory job queue. Jobs will not persist across restarts.",
+    );
   }
   if (!env.agentServiceToken) {
     throw new Error(
