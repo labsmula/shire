@@ -2,29 +2,26 @@
 
 import { useRouter } from "next/navigation";
 import { Briefcase, Sparkles, Users } from "lucide-react";
-import { useShireStore } from "@/lib/store";
 import { AuthShell } from "@/components/layout/auth-shell";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { RoleType } from "@/lib/types";
 
 const roles = [
   {
-    roleType: 1 as RoleType,
+    id: "candidate",
     icon: Sparkles,
     label: "Find Jobs",
     description: "AI matches you to verified, stake-backed roles. No spam recruiters.",
     href: "/onboarding/candidate",
   },
   {
-    roleType: 2 as RoleType,
+    id: "recruiter",
     icon: Briefcase,
     label: "Find Talent",
     description: "Post stake-backed jobs and let AI surface the best-fit candidates.",
     href: "/onboarding/recruiter",
   },
   {
-    roleType: 3 as RoleType,
+    id: "both",
     icon: Users,
     label: "Both",
     description: "Switch between hiring and applying with one wallet identity.",
@@ -34,13 +31,6 @@ const roles = [
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const registerUser = useShireStore((s) => s.registerUser);
-  const registeredOnchain = useShireStore((s) => s.registeredOnchain);
-
-  function choose(roleType: RoleType, href: string) {
-    registerUser(roleType);
-    router.push(href);
-  }
 
   return (
     <AuthShell back={{ href: "/connect", label: "Back" }} step="1 of 3">
@@ -48,16 +38,16 @@ export default function OnboardingPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">How will you use Shire?</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            This registers your wallet on Celo — you can always add the other role later.
+            Choose a profile to create. A role becomes active only after the profile is saved.
           </p>
         </div>
 
         <ul className="space-y-3">
-          {roles.map(({ roleType, icon: Icon, label, description, href }) => (
-            <li key={roleType}>
+          {roles.map(({ id, icon: Icon, label, description, href }) => (
+            <li key={id}>
               <button
                 type="button"
-                onClick={() => choose(roleType, href)}
+                onClick={() => router.push(href)}
                 className={cn(
                   "w-full rounded-2xl border border-border bg-card p-4 text-left transition-[border-color,box-shadow] hover:border-primary/50 hover:shadow-sm",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -77,14 +67,8 @@ export default function OnboardingPage() {
           ))}
         </ul>
 
-        {registeredOnchain && (
-          <p className="text-center text-xs text-muted-foreground">
-            Already registered — choose a role to update or continue setup.
-          </p>
-        )}
-
         <p className="text-center text-xs text-muted-foreground">
-          Simulated onchain registration — Celo Alfajores.
+          Celo registration stays separate from profile activation.
         </p>
       </div>
     </AuthShell>
