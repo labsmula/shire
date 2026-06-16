@@ -77,6 +77,15 @@ export function createEnv(input: NodeJS.ProcessEnv = process.env) {
   return {
     nodeEnv,
     port: Number(input.PORT ?? 3010),
+    redisUrl: input.REDIS_URL?.trim() || undefined,
+    agentServiceToken: input.SHIRE_AGENT_SERVICE_TOKEN?.trim() || undefined,
+    jobQueueName: input.SHIRE_JOB_QUEUE_NAME?.trim() || "shire-agent-jobs",
+    jobAttempts: parsePositiveInteger(input.SHIRE_JOB_ATTEMPTS, 3),
+    jobBackoffMs: parsePositiveInteger(input.SHIRE_JOB_BACKOFF_MS, 5_000),
+    cvMaxFileBytes: parsePositiveInteger(
+      input.SHIRE_CV_MAX_FILE_BYTES,
+      5 * 1024 * 1024,
+    ),
     autonomyMode: parseAutonomyMode(input.SHIRE_AUTONOMY_MODE),
     logLevel: input.SHIRE_LOG_LEVEL?.trim() || (nodeEnv === "development" ? "debug" : "info"),
     prettyLogs: parseBoolean(input.SHIRE_PRETTY_LOGS, nodeEnv !== "production"),

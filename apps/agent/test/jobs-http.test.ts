@@ -4,6 +4,7 @@ import test from "node:test";
 
 import { createRuntimeHttpServer } from "../src/server";
 import { InMemoryJobQueue } from "../src/runtime/jobs/in-memory-job-queue";
+import type { DurableJobRuntime } from "../src/runtime/jobs/bullmq-job-queue";
 
 test("enqueues and polls a deterministic worker job", async () => {
   const queue = new InMemoryJobQueue();
@@ -75,6 +76,121 @@ test("rejects invalid job payloads", async () => {
     );
 
     assert.equal(response.status, 400);
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("accepts authenticated CV documents and enforces status ownership", async () => {
+  let enqueued: any;
+  const runtime: DurableJobRuntime = {
+    async enqueue(request) {
+      enqueued = request;
+      return {
+        id: "job-cv-1",
+        name: request.name,
+        payload: request.payload,
+        status: "queued",
+        attempts: 0,
+        maxAttempts: 3,
+        createdAt: new Date(0).toISOString(),
+      };
+    },
+    async get(jobId, candidateId) {
+      if (jobId !== "job-cv-1" || candidateId !== "candidate-1") {
+        return undefined;
+      }
+      return {
+        id: jobId,
+        name: "cv-parse",
+        payload: { candidateId, rawCv: "Senior Engineer" },
+        status: "queued",
+        attempts: 0,
+        maxAttempts: 3,
+        createdAt: new Date(0).toISOString(),
+      };
+    },
+    async start() {},
+    async close() {},
+  };
+  const server = await createRuntimeHttpServer({
+    durableJobRuntime: runtime,
+    serviceToken: "service-secret",
+    extractCvDocument: async () => "Senior Engineer",
+  });
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const unauthorized = await fetch(`${baseUrl}/jobs/cv-document`, {
+      method: "POST",
+    });
+    assert.equal(unauthorized.status, 401);
+
+    const form = new FormData();
+    form.set("candidateId", "candidate-1");
+    form.set(
+      "file",
+      new Blob(["%PDF-1.7\nfake"], { type: "application/pdf" }),
+      "cv.pdf",
+    );
+    const accepted = await fetch(`${baseUrl}/jobs/cv-document`, {
+      method: "POST",
+      headers: { authorization: "Bearer service-secret" },
+      body: form,
+    });
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(enqueued, {
+      name: "cv-parse",
+      payload: { candidateId: "candidate-1", rawCv: "Senior Engineer" },
+    });
+
+    const owned = await fetch(
+      `${baseUrl}/jobs/job-cv-1?candidateId=candidate-1`,
+      { headers: { authorization: "Bearer service-secret" } },
+    );
+    assert.equal(owned.status, 200);
+
+    const foreign = await fetch(
+      `${baseUrl}/jobs/job-cv-1?candidateId=candidate-2`,
+      { headers: { authorization: "Bearer service-secret" } },
+    );
+    assert.equal(foreign.status, 404);
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("returns 503 when durable job status is unavailable", async () => {
+  const runtime: DurableJobRuntime = {
+    async enqueue() {
+      throw new Error("unused");
+    },
+    async get() {
+      throw new Error("redis unavailable");
+    },
+    async start() {},
+    async close() {},
+  };
+  const server = await createRuntimeHttpServer({
+    durableJobRuntime: runtime,
+    serviceToken: "service-secret",
+  });
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/jobs/job-1?candidateId=candidate-1`,
+      { headers: { authorization: "Bearer service-secret" } },
+    );
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { status: "queue-unavailable" });
   } finally {
     server.close();
     await once(server, "close");

@@ -56,6 +56,17 @@ test("defaults bounded chat security config", () => {
   assert.equal(env.outputMaxCharacters, 12_000);
 });
 
+test("defaults durable job and CV upload config", () => {
+  const env = createEnv({});
+
+  assert.equal(env.redisUrl, undefined);
+  assert.equal(env.agentServiceToken, undefined);
+  assert.equal(env.jobQueueName, "shire-agent-jobs");
+  assert.equal(env.jobAttempts, 3);
+  assert.equal(env.jobBackoffMs, 5_000);
+  assert.equal(env.cvMaxFileBytes, 5 * 1024 * 1024);
+});
+
 test("accepts comma-separated model chain overrides", () => {
   const env = createEnv({
     SHIRE_MODEL_CHEAP:
@@ -89,6 +100,12 @@ test("parses custom agent config from environment variables", () => {
     SHIRE_EMBEDDING_BASE_URL: "https://embedding.example/v1/",
     SHIRE_WORKER_ENABLED: "false",
     SHIRE_LIVE_LLM_TESTS: "true",
+    REDIS_URL: "rediss://redis.example:6379",
+    SHIRE_AGENT_SERVICE_TOKEN: "secret",
+    SHIRE_JOB_QUEUE_NAME: "custom-jobs",
+    SHIRE_JOB_ATTEMPTS: "4",
+    SHIRE_JOB_BACKOFF_MS: "7000",
+    SHIRE_CV_MAX_FILE_BYTES: "6000000",
   });
 
   assert.equal(env.logLevel, "warn");
@@ -99,6 +116,12 @@ test("parses custom agent config from environment variables", () => {
   assert.equal(env.embeddingBaseUrl, "https://embedding.example/v1");
   assert.equal(env.workerEnabled, false);
   assert.equal(env.liveLlmTestsEnabled, true);
+  assert.equal(env.redisUrl, "rediss://redis.example:6379");
+  assert.equal(env.agentServiceToken, "secret");
+  assert.equal(env.jobQueueName, "custom-jobs");
+  assert.equal(env.jobAttempts, 4);
+  assert.equal(env.jobBackoffMs, 7_000);
+  assert.equal(env.cvMaxFileBytes, 6_000_000);
 });
 
 test("rejects invalid positive integer config", () => {

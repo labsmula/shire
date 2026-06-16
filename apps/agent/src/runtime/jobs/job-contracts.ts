@@ -25,7 +25,12 @@ export const jobRequestSchema = z.discriminatedUnion("name", [
 
 export type JobRequest = z.infer<typeof jobRequestSchema>;
 export type JobName = JobRequest["name"];
-export type JobStatus = "queued" | "active" | "completed" | "failed";
+export type JobStatus =
+  | "queued"
+  | "delayed"
+  | "active"
+  | "completed"
+  | "failed";
 
 export type JobPayloadMap = {
   "cv-parse": Extract<JobRequest, { name: "cv-parse" }>["payload"];
@@ -56,6 +61,8 @@ export type JobEnvelope = {
   payload: JobPayloadMap[JobName];
   status: JobStatus;
   attempts: number;
+  maxAttempts?: number;
+  nextRetryAt?: string;
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
