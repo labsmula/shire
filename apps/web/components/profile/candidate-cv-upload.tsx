@@ -2,9 +2,8 @@
 
 import * as React from "react";
 import { FileText, LoaderCircle, RotateCcw, Upload } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
 
-import { PRIVY_ENABLED } from "@/lib/auth/use-auth";
+import { useAccessToken } from "@/lib/auth/use-access-token";
 import type { CandidateProfile } from "@/lib/types";
 import { mapAgentProfileToForm } from "@/lib/cv-profile-draft";
 import {
@@ -24,32 +23,6 @@ const acceptedTypes = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 const maxFileBytes = 5 * 1024 * 1024;
-
-function useDemoAccessToken() {
-  return React.useCallback(async () => undefined, []);
-}
-
-function usePrivyAccessToken() {
-  const { authenticated, getAccessToken } = usePrivy();
-  return React.useCallback(
-    async () => {
-      if (!authenticated) {
-        throw new Error("Sign in before uploading your CV.");
-      }
-      const token = await getAccessToken();
-      if (!token) {
-        throw new Error("Your session is unavailable. Sign in again.");
-      }
-      return token;
-    },
-    [authenticated, getAccessToken],
-  );
-}
-
-function useCvAccessToken() {
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- PRIVY_ENABLED is constant per build.
-  return PRIVY_ENABLED ? usePrivyAccessToken() : useDemoAccessToken();
-}
 
 function statusCopy(state: CvJobState | null) {
   if (!state) return null;
@@ -74,7 +47,7 @@ export function CandidateCvUpload({
 }: {
   onDraft: (draft: CandidateProfile) => void;
 }) {
-  const accessToken = useCvAccessToken();
+  const accessToken = useAccessToken();
   const existing = useShireStore((state) => state.candidateProfile);
   const [file, setFile] = React.useState<File | null>(null);
   const [state, setState] = React.useState<CvJobState | null>(null);

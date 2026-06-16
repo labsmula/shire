@@ -1,11 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { useAccessToken } from "@/lib/auth/use-access-token";
+import { PRIVY_ENABLED } from "@/lib/auth/use-auth";
+import { saveProfile } from "@/lib/profile-client";
 import { recruiterProfileSchema, type RecruiterProfileValues } from "@/lib/schemas";
 import { getRecruiterById, ME_RECRUITER_ID, useShireStore } from "@/lib/store";
+import type { RecruiterProfile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,11 +24,19 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
-export function RecruiterProfileForm({ redirectTo }: { redirectTo?: string }) {
+export function RecruiterProfileForm({
+  redirectTo,
+  initialProfile,
+}: {
+  redirectTo?: string;
+  initialProfile?: RecruiterProfile | null;
+}) {
   const router = useRouter();
+  const accessToken = useAccessToken();
   const recruiterProfile = useShireStore((s) => s.recruiterProfile);
   const save = useShireStore((s) => s.saveRecruiterProfile);
-  const current = getRecruiterById({ recruiterProfile }, ME_RECRUITER_ID);
+  const [saving, setSaving] = React.useState(false);
+  const current = initialProfile ?? getRecruiterById({ recruiterProfile }, ME_RECRUITER_ID);
 
   const form = useForm<RecruiterProfileValues>({
     resolver: zodResolver(recruiterProfileSchema),
@@ -36,20 +49,57 @@ export function RecruiterProfileForm({ redirectTo }: { redirectTo?: string }) {
     },
   });
 
-  function onSubmit(values: RecruiterProfileValues) {
-    save({
+  React.useEffect(() => {
+    if (initialProfile) {
+      form.reset({
+        companyName: initialProfile.companyName,
+        companyWebsite: initialProfile.companyWebsite ?? "",
+        companyDescription: initialProfile.companyDescription,
+        contactEmail: initialProfile.contactEmail ?? "",
+        location: initialProfile.location ?? "",
+      });
+    }
+  }, [form, initialProfile]);
+
+  async function onSubmit(values: RecruiterProfileValues) {
+    const editableProfile = {
       companyName: values.companyName,
       companyWebsite: values.companyWebsite || undefined,
       companyDescription: values.companyDescription,
       contactEmail: values.contactEmail || undefined,
       location: values.location || undefined,
+    };
+    const demoProfile = {
+      ...editableProfile,
       verificationStatus: current?.verificationStatus ?? "UNVERIFIED",
       trustLevel: current?.trustLevel ?? 30,
       completedHires: current?.completedHires ?? 0,
       disputeCount: current?.disputeCount ?? 0,
-    });
-    toast.success("Company profile saved");
-    if (redirectTo) router.push(redirectTo);
+    };
+
+    setSaving(true);
+    try {
+      if (PRIVY_ENABLED) {
+        const token = await accessToken();
+        const persisted = await saveProfile<RecruiterProfile, typeof editableProfile>(
+          "recruiter",
+          editableProfile,
+          token,
+        );
+        save(persisted);
+      } else {
+        save(demoProfile);
+      }
+      toast.success("Company profile saved");
+      if (redirectTo) router.push(redirectTo);
+    } catch (error) {
+      toast.error("Company profile was not saved", {
+        description:
+          error instanceof Error ? error.message : "Try again in a moment.",
+      });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -124,8 +174,8 @@ export function RecruiterProfileForm({ redirectTo }: { redirectTo?: string }) {
           />
         </div>
         <div className="flex justify-end">
-          <Button type="submit" size="lg">
-            Save company
+          <Button type="submit" size="lg" disabled={saving}>
+            {saving ? "Saving..." : "Save company"}
           </Button>
         </div>
       </form>
