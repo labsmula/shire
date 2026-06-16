@@ -4,7 +4,9 @@ import {
   runParseCvPipeline,
 } from "../mastra/workflows/parse-cv.workflow";
 import { jobRunnerData } from "../runtime/data/runtime-data";
+import { runJobCli } from "../runtime/job-cli";
 import { createJobRouting } from "../runtime/job-routing";
+import { cvParseProcessor } from "../runtime/jobs/cv-parse.processor";
 
 type CvParseJobDependencies = Pick<
   Parameters<typeof runParseCvPipeline>[0],
@@ -80,3 +82,33 @@ export async function runCvParseJob(
     usage: record.usage,
   };
 }
+
+async function runCvParseCliJob() {
+  const candidate = jobRunnerData["cv-parse"].candidate;
+  const result = await cvParseProcessor.process(
+    {
+      candidateId: candidate.id,
+      rawCv: [
+        candidate.name,
+        candidate.role,
+        candidate.summary,
+        candidate.skills.join(", "),
+      ].join("\n"),
+    },
+    {
+      jobId: crypto.randomUUID(),
+      attempt: 1,
+      signal: new AbortController().signal,
+    },
+  );
+
+  return {
+    job: "cv-parse" as const,
+    agent: cvProfileAgent.id,
+    workflow: parseCvWorkflow.id,
+    routing: createJobRouting("cv-parse"),
+    result,
+  };
+}
+
+runJobCli(import.meta.url, runCvParseCliJob);

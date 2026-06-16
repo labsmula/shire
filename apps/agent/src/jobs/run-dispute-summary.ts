@@ -1,6 +1,7 @@
 import { disputeSummaryAgent } from "../mastra/agents/dispute-summary.agent";
 import { disputeSummaryWorkflow } from "../mastra/workflows/dispute-summary.workflow";
 import { jobRunnerData } from "../runtime/data/runtime-data";
+import { runJobCli } from "../runtime/job-cli";
 import { createJobRouting } from "../runtime/job-routing";
 
 export async function runDisputeSummaryJob() {
@@ -13,3 +14,5 @@ export async function runDisputeSummaryJob() {
     usage: [],
   };
 }
+
+runJobCli(import.meta.url, runDisputeSummaryJob);

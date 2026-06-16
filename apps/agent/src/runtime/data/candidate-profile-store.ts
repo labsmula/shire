@@ -29,3 +29,5 @@ export class InMemoryCandidateProfileStore
     return record ? structuredClone(record) : null;
   }
 }
+
+export const candidateProfileStore = new InMemoryCandidateProfileStore();

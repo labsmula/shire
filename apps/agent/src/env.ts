@@ -102,6 +102,11 @@ export function createEnv(input: NodeJS.ProcessEnv = process.env) {
       input.SHIRE_WORKING_MEMORY_ENABLED,
       false,
     ),
+    workerEnabled: parseBoolean(input.SHIRE_WORKER_ENABLED, true),
+    liveLlmTestsEnabled: parseBoolean(
+      input.SHIRE_LIVE_LLM_TESTS,
+      false,
+    ),
     chatMaxBodyBytes: parsePositiveInteger(input.SHIRE_CHAT_MAX_BODY_BYTES, 65_536),
     chatMaxMessages: parsePositiveInteger(input.SHIRE_CHAT_MAX_MESSAGES, 50),
     chatMaxMessageCharacters: parsePositiveInteger(

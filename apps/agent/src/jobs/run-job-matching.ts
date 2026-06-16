@@ -1,6 +1,7 @@
 import { jobMatchingAgent } from "../mastra/agents/job-matching.agent";
 import { jobMatchingWorkflow } from "../mastra/workflows/job-matching.workflow";
 import { jobRunnerData } from "../runtime/data/runtime-data";
+import { runJobCli } from "../runtime/job-cli";
 import { createJobRouting } from "../runtime/job-routing";
 
 export async function runJobMatchingJob() {
@@ -13,3 +14,5 @@ export async function runJobMatchingJob() {
     usage: [],
   };
 }
+
+runJobCli(import.meta.url, runJobMatchingJob);

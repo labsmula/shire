@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 test("runtime scripts load the agent .env file", async () => {
@@ -34,4 +36,26 @@ test("runtime scripts load the agent .env file", async () => {
   ]) {
     assert.equal(packageJson.dependencies[dependency], undefined);
   }
+});
+
+test("onchain job script prints its result when run directly", () => {
+  const agentDirectory = fileURLToPath(new URL("..", import.meta.url));
+  const result = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "src/jobs/run-onchain-sync.ts"],
+    {
+      cwd: agentDirectory,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        OPENROUTER_API_KEY: "test-openrouter-api-key",
+      },
+    },
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.notEqual(result.stdout.trim(), "");
+
+  const output = JSON.parse(result.stdout) as { job?: string };
+  assert.equal(output.job, "onchain-sync");
 });

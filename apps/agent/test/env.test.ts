@@ -34,6 +34,8 @@ test("defaults cost-aware model, memory, and knowledge config", () => {
   assert.equal(env.agentKnowledgeIndex, "shire_context");
   assert.equal(env.ragTopK, 5);
   assert.equal(env.ragMaxCharacters, 8_000);
+  assert.equal(env.workerEnabled, true);
+  assert.equal(env.liveLlmTestsEnabled, false);
 });
 
 test("defaults bounded chat security config", () => {
@@ -85,6 +87,8 @@ test("parses custom agent config from environment variables", () => {
     SHIRE_EMBEDDING_ENABLED: "true",
     SHIRE_WORKING_MEMORY_ENABLED: "true",
     SHIRE_EMBEDDING_BASE_URL: "https://embedding.example/v1/",
+    SHIRE_WORKER_ENABLED: "false",
+    SHIRE_LIVE_LLM_TESTS: "true",
   });
 
   assert.equal(env.logLevel, "warn");
@@ -93,6 +97,8 @@ test("parses custom agent config from environment variables", () => {
   assert.equal(env.embeddingEnabled, true);
   assert.equal(env.workingMemoryEnabled, true);
   assert.equal(env.embeddingBaseUrl, "https://embedding.example/v1");
+  assert.equal(env.workerEnabled, false);
+  assert.equal(env.liveLlmTestsEnabled, true);
 });
 
 test("rejects invalid positive integer config", () => {

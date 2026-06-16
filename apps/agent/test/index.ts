@@ -31,4 +31,12 @@ await Promise.all([
   import("./chat-output-processor.test"),
   import("./security-guard.test"),
   import("./security-policy.test"),
+  import("./job-contracts.test"),
+  import("./in-memory-job-queue.test"),
+  import("./job-processors.test"),
+  import("./cv-agent-generator.test"),
+  import("./cv-parse-processor.test"),
+  import("./agent-worker.test"),
+  import("./jobs-http.test"),
+  import("./live-cv-worker.test"),
 ]);
