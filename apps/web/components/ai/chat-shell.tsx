@@ -27,7 +27,7 @@ export function ChatShell({ role }: { role: AppRole }) {
 
   return (
     <ChatPanel
-      api={`/api/chat/${scope.scope}`}
+      api={`/api/chat/${scope.resourceType ? "resource" : "general"}`}
       scope={scope}
       title="Shire assistant"
     />

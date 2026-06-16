@@ -14,8 +14,8 @@ import { BotIcon } from "lucide-react";
 import { ChatContextBadge } from "./chat-context-badge";
 import { Thread } from "@/components/assistant-ui/thread";
 import { Button } from "@/components/ui/button";
-import { buildChatContextLabel, buildChatProxyBody } from "@/lib/chat/context";
-import type { ChatScope } from "@/lib/chat/types";
+import { buildChatContextLabel, toChatProxyRequest } from "@/lib/chat/context";
+import type { ChatScopeRequest } from "@/lib/chat/types";
 
 export function ChatPanel({
   api,
@@ -23,7 +23,7 @@ export function ChatPanel({
   title,
 }: {
   api: string;
-  scope: ChatScope;
+  scope: ChatScopeRequest;
   title: string;
 }) {
   const transport = useMemo(
@@ -32,7 +32,7 @@ export function ChatPanel({
         api,
         prepareSendMessagesRequest({ messages }) {
           return {
-            body: buildChatProxyBody(scope, messages),
+            body: toChatProxyRequest(scope, messages),
           };
         },
       }),
