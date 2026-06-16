@@ -295,7 +295,7 @@ export async function createRuntimeHttpServer(
       maxMessageCharacters: env.chatMaxMessageCharacters,
     });
 
-    if (!validation.valid) {
+    if (validation.valid === false) {
       runtimeLogger.warn(
         {
           agentId: request.params.agentId,
@@ -334,7 +334,7 @@ export async function createRuntimeHttpServer(
       env.chatRateLimitWindowSeconds * 1000,
     );
 
-    if (!rateResult.allowed) {
+    if (rateResult.allowed === false) {
       runtimeLogger.warn(
         {
           agentId: request.params.agentId,
