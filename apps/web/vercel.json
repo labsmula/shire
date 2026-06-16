@@ -1,7 +1,5 @@
 {
-  "framework": "nextjs",
-  "installCommand": "cd ../.. && npm install",
-  "buildCommand": "cd ../.. && npx turbo run build --filter=@shire/web",
+  "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "ignoreCommand": "cd ../.. && npx turbo-ignore @shire/web"
+  "installCommand": "npm install"
 }
