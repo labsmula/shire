@@ -229,6 +229,14 @@ export async function createRuntimeHttpServer(
   });
 
   app.use("/chat/:agentId", (request, response, next) => {
+    if (!isAuthorized(request)) {
+      response.status(401).json({ status: "unauthorized" });
+      return;
+    }
+    next();
+  });
+
+  app.use("/chat/:agentId", (request, response, next) => {
     const startedAt = Date.now();
     const agentId = request.params.agentId;
 

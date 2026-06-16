@@ -14,10 +14,15 @@ import {
   PROMPT_INJECTION_RESPONSE,
 } from "../src/runtime/chat-guard";
 
+const CHAT_SERVICE_TOKEN = "service-secret";
+
 async function startTestServer(
   dependencies?: Parameters<typeof createRuntimeHttpServer>[0],
 ) {
-  const server = await createRuntimeHttpServer(dependencies);
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+    ...dependencies,
+  });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, () => resolve());
@@ -65,6 +70,13 @@ function createChatBody(role: "candidate" | "recruiter", text: string) {
   };
 }
 
+function chatHeaders(token = CHAT_SERVICE_TOKEN) {
+  return {
+    authorization: `Bearer ${token}`,
+    "content-type": "application/json",
+  };
+}
+
 test("resolves known job names", () => {
   assert.equal(resolveJobName("cv-parse"), "cv-parse");
   assert.equal(resolveJobName("job-matching"), "job-matching");
@@ -101,7 +113,9 @@ test("returns bootstrap output when no job is provided", async () => {
 });
 
 test("runtime http server exposes health and not-found responses", async () => {
-  const server = await createRuntimeHttpServer();
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+  });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -135,8 +149,10 @@ test("runtime http server exposes health and not-found responses", async () => {
   }
 });
 
-test("runtime http server exposes the role-aware chat route", async () => {
-  const server = await createRuntimeHttpServer();
+test("chat rejects requests without the service token", async () => {
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+  });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -152,6 +168,68 @@ test("runtime http server exposes the role-aware chat route", async () => {
       {
         method: "POST",
         headers: { "content-type": "application/json" },
+        body: JSON.stringify(createChatBody("candidate", "How does Shire work?")),
+      },
+    );
+
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { status: "unauthorized" });
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("chat rejects an invalid service token", async () => {
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, () => resolve());
+  });
+
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/chat/role-aware-chat-agent`,
+      {
+        method: "POST",
+        headers: chatHeaders("wrong-secret"),
+        body: JSON.stringify(createChatBody("candidate", "How does Shire work?")),
+      },
+    );
+
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { status: "unauthorized" });
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("chat accepts the configured service token", async () => {
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, () => resolve());
+  });
+
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/chat/role-aware-chat-agent`,
+      {
+        method: "POST",
+        headers: chatHeaders(),
         body: JSON.stringify({
           messages: [],
           memory: {
@@ -164,6 +242,31 @@ test("runtime http server exposes the role-aware chat route", async () => {
     );
 
     assert.notEqual(response.status, 404);
+    assert.notEqual(response.status, 401);
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("health remains public when chat service auth is configured", async () => {
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, () => resolve());
+  });
+
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/health`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), getRuntimeBootstrapOutput());
   } finally {
     server.close();
     await once(server, "close");
@@ -171,7 +274,9 @@ test("runtime http server exposes the role-aware chat route", async () => {
 });
 
 test("chat route blocks prompt injection with a deterministic stream", async () => {
-  const server = await createRuntimeHttpServer();
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+  });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -186,7 +291,7 @@ test("chat route blocks prompt injection with a deterministic stream", async () 
       `http://127.0.0.1:${address.port}/chat/role-aware-chat-agent`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: chatHeaders(),
         body: JSON.stringify({
           messages: [
             {
@@ -218,6 +323,7 @@ test("chat route blocks prompt injection with a deterministic stream", async () 
 
 test("chat route blocks suspicious obfuscated instructions with the security guard", async () => {
   const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
     securityIndicatorClassifier: () => ({
       level: "suspicious",
       category: "obfuscation",
@@ -247,7 +353,7 @@ test("chat route blocks suspicious obfuscated instructions with the security gua
       `http://127.0.0.1:${address.port}/chat/role-aware-chat-agent`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: chatHeaders(),
         body: JSON.stringify({
           messages: [
             {
@@ -271,7 +377,9 @@ test("chat route blocks suspicious obfuscated instructions with the security gua
 });
 
 test("chat route forwards unrelated questions to the agent", async () => {
-  const server = await createRuntimeHttpServer();
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+  });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -286,7 +394,7 @@ test("chat route forwards unrelated questions to the agent", async () => {
       `http://127.0.0.1:${address.port}/chat/role-aware-chat-agent`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: chatHeaders(),
         body: JSON.stringify({
           messages: [
             {
@@ -311,7 +419,9 @@ test("chat route forwards unrelated questions to the agent", async () => {
 });
 
 test("chat route forwards valid Shire questions to Mastra", async () => {
-  const server = await createRuntimeHttpServer();
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+  });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -326,7 +436,7 @@ test("chat route forwards valid Shire questions to Mastra", async () => {
       `http://127.0.0.1:${address.port}/chat/role-aware-chat-agent`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: chatHeaders(),
         body: JSON.stringify({
           messages: [
             {
@@ -370,7 +480,7 @@ test("blocked chat requests skip product retrieval", async () => {
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: chatHeaders(),
       body: JSON.stringify(
         createChatBody(
           "candidate",
@@ -404,7 +514,7 @@ test("allowed candidate chat retrieves candidate product knowledge", async () =>
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: chatHeaders(),
       body: JSON.stringify(
         createChatBody("candidate", "How does candidate staking work?"),
       ),
@@ -432,7 +542,7 @@ test("platform-help chat reaches the scoped agent instead of fallback", async ()
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: chatHeaders(),
       body: JSON.stringify(
         createChatBody(
           "candidate",
@@ -463,7 +573,7 @@ test("allowed recruiter chat retrieves recruiter product knowledge", async () =>
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: chatHeaders(),
       body: JSON.stringify(
         createChatBody("recruiter", "How do talent recommendations work?"),
       ),
