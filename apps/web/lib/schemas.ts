@@ -4,7 +4,7 @@ const optionalUrl = z
   .union([z.string().url("Enter a valid URL"), z.literal("")])
   .optional();
 
-export const candidateProfileSchema = z.object({
+const candidateProfileFields = {
   displayName: z.string().min(2, "Add your name"),
   bio: z.string().min(10, "A short bio helps recruiters").max(400),
   skills: z.array(z.string()).min(1, "Add at least one skill"),
@@ -16,23 +16,66 @@ export const candidateProfileSchema = z.object({
   xUrl: optionalUrl,
   location: z.string().optional(),
   timezone: z.string().optional(),
-  languages: z.array(z.string()).default([]),
+  languages: z.array(z.string()),
   salaryExpectation: z.string().optional(),
-  visibility: z.enum(["PUBLIC", "PRIVATE"]).default("PUBLIC"),
+  visibility: z.enum(["PUBLIC", "PRIVATE"]),
+};
+
+export const candidateProfileSchema = z.object({
+  ...candidateProfileFields,
+  languages: candidateProfileFields.languages.default([]),
+  visibility: candidateProfileFields.visibility.default("PUBLIC"),
 });
 
 export type CandidateProfileInput = z.input<typeof candidateProfileSchema>;
 export type CandidateProfileValues = z.output<typeof candidateProfileSchema>;
 
-export const recruiterProfileSchema = z.object({
+export const persistedCandidateProfileSchema = z
+  .strictObject(candidateProfileFields)
+  .transform((values) => ({
+    ...values,
+    portfolioUrl: values.portfolioUrl || undefined,
+    githubUrl: values.githubUrl || undefined,
+    linkedinUrl: values.linkedinUrl || undefined,
+    xUrl: values.xUrl || undefined,
+  }));
+
+const recruiterProfileFields = {
   companyName: z.string().min(2, "Add your company name"),
   companyWebsite: optionalUrl,
   companyDescription: z.string().min(10, "Describe your company").max(400),
   contactEmail: z.union([z.string().email("Enter a valid email"), z.literal("")]).optional(),
   location: z.string().optional(),
-});
+};
 
+export const recruiterProfileSchema = z.strictObject(recruiterProfileFields);
+
+export type RecruiterProfileInput = z.input<typeof recruiterProfileSchema>;
 export type RecruiterProfileValues = z.output<typeof recruiterProfileSchema>;
+
+export const persistedRecruiterProfileSchema = z
+  .strictObject(recruiterProfileFields)
+  .transform((values) => ({
+    ...values,
+    companyWebsite: values.companyWebsite || undefined,
+    contactEmail: values.contactEmail || undefined,
+    location: values.location || undefined,
+  }));
+
+export const storedRecruiterProfileSchema = z
+  .strictObject({
+    ...recruiterProfileFields,
+    verificationStatus: z.enum(["UNVERIFIED", "PENDING", "VERIFIED"]),
+    trustLevel: z.number().min(0).max(100),
+    completedHires: z.number().int().nonnegative(),
+    disputeCount: z.number().int().nonnegative(),
+  })
+  .transform((values) => ({
+    ...values,
+    companyWebsite: values.companyWebsite || undefined,
+    contactEmail: values.contactEmail || undefined,
+    location: values.location || undefined,
+  }));
 
 export const jobDraftSchema = z.object({
   title: z.string().min(4, "Add a clear job title"),

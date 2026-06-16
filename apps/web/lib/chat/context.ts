@@ -1,14 +1,18 @@
-import type { ChatMessage, ChatProxyRequest, ChatRole, ChatScope } from "./types";
-import { buildChatScope, buildChatScopeLabel } from "./thread";
+import type {
+  ChatProxyRequest,
+  ChatRole,
+  ChatScopeRequest,
+  TrustedChatScope,
+} from "./types";
+import { buildChatScopeLabel, buildChatScopeRequest } from "./thread";
 
-export function buildServerChatScope(input: {
+export function buildServerChatScopeRequest(input: {
   resourceId?: string;
   resourceLabel?: string;
-  resourceType?: ChatScope["resourceType"];
-  role: ChatScope["role"];
-  viewerId: string;
+  resourceType?: ChatScopeRequest["resourceType"];
+  role: ChatScopeRequest["role"];
 }) {
-  return buildChatScope(input);
+  return buildChatScopeRequest(input);
 }
 
 export function resolveChatScopeForPathname(input: {
@@ -18,15 +22,11 @@ export function resolveChatScopeForPathname(input: {
   recruiterProfileLabel?: string;
   role: ChatRole;
 }) {
-  const viewerId = input.role === "candidate" ? "candidate-001" : "recruiter-001";
-
   if (input.role === "candidate") {
     if (input.pathname === "/candidate/profile") {
-      return buildServerChatScope({
-        viewerId,
+      return buildServerChatScopeRequest({
         role: input.role,
         resourceType: "candidate",
-        resourceId: "candidate-001",
         resourceLabel: input.candidateProfileLabel ?? "You",
       });
     }
@@ -42,22 +42,11 @@ export function resolveChatScopeForPathname(input: {
             ? "Solidity Engineer"
             : undefined);
 
-      if (jobId === "job_fe_aperture") {
-        return buildServerChatScope({
-          viewerId,
+      if (jobId === "job_fe_aperture" || jobId === "job_sol_mesh") {
+        return buildServerChatScopeRequest({
           role: input.role,
           resourceType: "job",
-          resourceId: "job-001",
-          resourceLabel: jobLabel,
-        });
-      }
-
-      if (jobId === "job_sol_mesh") {
-        return buildServerChatScope({
-          viewerId,
-          role: input.role,
-          resourceType: "job",
-          resourceId: "job-002",
+          resourceId: jobId,
           resourceLabel: jobLabel,
         });
       }
@@ -66,11 +55,9 @@ export function resolveChatScopeForPathname(input: {
 
   if (input.role === "recruiter") {
     if (input.pathname === "/recruiter/profile") {
-      return buildServerChatScope({
-        viewerId,
+      return buildServerChatScopeRequest({
         role: input.role,
         resourceType: "company",
-        resourceId: "company-001",
         resourceLabel: input.recruiterProfileLabel ?? "Aperture Labs",
       });
     }
@@ -86,32 +73,21 @@ export function resolveChatScopeForPathname(input: {
             ? "Solidity Engineer"
             : undefined);
 
-      if (jobId === "job_fe_aperture") {
-        return buildServerChatScope({
-          viewerId,
+      if (jobId === "job_fe_aperture" || jobId === "job_sol_mesh") {
+        return buildServerChatScopeRequest({
           role: input.role,
           resourceType: "job",
-          resourceId: "job-001",
-          resourceLabel: jobLabel,
-        });
-      }
-
-      if (jobId === "job_sol_mesh") {
-        return buildServerChatScope({
-          viewerId,
-          role: input.role,
-          resourceType: "job",
-          resourceId: "job-002",
+          resourceId: jobId,
           resourceLabel: jobLabel,
         });
       }
     }
   }
 
-  return buildServerChatScope({ viewerId, role: input.role });
+  return buildServerChatScopeRequest({ role: input.role });
 }
 
-function buildChatSystemMessage(scope: ChatScope) {
+function buildChatSystemMessage(scope: TrustedChatScope) {
   const scopeParts = [
     `Viewer: ${scope.viewerId}`,
     `Role: ${scope.role}`,
@@ -127,7 +103,7 @@ function buildChatSystemMessage(scope: ChatScope) {
 }
 
 export function buildChatProxyBody(
-  scope: ChatScope,
+  scope: TrustedChatScope,
   messages: unknown[],
 ) {
   const system = buildChatSystemMessage(scope);
@@ -144,7 +120,7 @@ export function buildChatProxyBody(
   };
 }
 
-export function buildChatContextLabel(scope: ChatScope) {
+export function buildChatContextLabel(scope: ChatScopeRequest) {
   return buildChatScopeLabel({
     role: scope.role,
     resourceType: scope.resourceType,
@@ -153,8 +129,8 @@ export function buildChatContextLabel(scope: ChatScope) {
 }
 
 export function toChatProxyRequest(
-  scope: ChatScope,
-  messages: ChatMessage[],
+  scope: ChatScopeRequest,
+  messages: unknown[],
 ): ChatProxyRequest {
   return { scope, messages };
 }

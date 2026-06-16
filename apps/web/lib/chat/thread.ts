@@ -1,4 +1,9 @@
-import type { ChatResourceType, ChatRole, ChatScope } from "./types";
+import type {
+  ChatResourceType,
+  ChatRole,
+  ChatScopeRequest,
+  TrustedChatScope,
+} from "./types";
 
 function roleLabel(role: ChatRole) {
   return role === "candidate" ? "Candidate" : "Recruiter";
@@ -29,7 +34,7 @@ export function buildChatScope(input: {
   resourceType?: ChatResourceType;
   role: ChatRole;
   viewerId: string;
-}): ChatScope {
+}): TrustedChatScope {
   const hasResource = Boolean(input.resourceType && input.resourceId);
   const resourceKey = hasResource
     ? `${input.role}:${input.viewerId}:${input.resourceType}:${input.resourceId}`
@@ -46,5 +51,19 @@ export function buildChatScope(input: {
       : `${input.role}:${input.viewerId}`,
     resourceKey,
     scope: hasResource ? "resource" : "general",
+  };
+}
+
+export function buildChatScopeRequest(input: {
+  resourceId?: string;
+  resourceLabel?: string;
+  resourceType?: ChatResourceType;
+  role: ChatRole;
+}): ChatScopeRequest {
+  return {
+    role: input.role,
+    resourceType: input.resourceType,
+    resourceId: input.resourceId,
+    resourceLabel: input.resourceLabel,
   };
 }

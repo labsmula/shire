@@ -2,7 +2,14 @@ export type ChatRole = "candidate" | "recruiter";
 
 export type ChatResourceType = "job" | "candidate" | "company" | "application";
 
-export type ChatScope = {
+export type ChatScopeRequest = {
+  role: ChatRole;
+  resourceType?: ChatResourceType;
+  resourceId?: string;
+  resourceLabel?: string;
+};
+
+export type TrustedChatScope = {
   viewerId: string;
   role: ChatRole;
   resourceType?: ChatResourceType;
@@ -19,6 +26,6 @@ export type ChatMessage = {
 };
 
 export type ChatProxyRequest = {
-  messages: ChatMessage[];
-  scope: ChatScope;
+  messages: unknown[];
+  scope: ChatScopeRequest;
 };

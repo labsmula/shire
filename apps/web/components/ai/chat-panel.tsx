@@ -14,8 +14,9 @@ import { BotIcon } from "lucide-react";
 import { ChatContextBadge } from "./chat-context-badge";
 import { Thread } from "@/components/assistant-ui/thread";
 import { Button } from "@/components/ui/button";
-import { buildChatContextLabel, buildChatProxyBody } from "@/lib/chat/context";
-import type { ChatScope } from "@/lib/chat/types";
+import { useAccessToken } from "@/lib/auth/use-access-token";
+import { buildChatContextLabel } from "@/lib/chat/context";
+import type { ChatScopeRequest } from "@/lib/chat/types";
 
 export function ChatPanel({
   api,
@@ -23,20 +24,31 @@ export function ChatPanel({
   title,
 }: {
   api: string;
-  scope: ChatScope;
+  scope: ChatScopeRequest;
   title: string;
 }) {
+  const accessToken = useAccessToken();
   const transport = useMemo(
     () =>
       new AssistantChatTransport({
         api,
+        headers: async (): Promise<Record<string, string>> => {
+          const token = await accessToken();
+          return token ? { authorization: `Bearer ${token}` } : {};
+        },
         prepareSendMessagesRequest({ messages }) {
           return {
-            body: buildChatProxyBody(scope, messages),
+            body: {
+              role: scope.role,
+              resourceType: scope.resourceType,
+              resourceId: scope.resourceId,
+              resourceLabel: scope.resourceLabel,
+              messages,
+            },
           };
         },
       }),
-    [api, scope],
+    [accessToken, api, scope],
   );
 
   const runtime = useChatRuntime({ transport });

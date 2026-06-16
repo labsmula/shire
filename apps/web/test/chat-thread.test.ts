@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildChatProxyBody } from "../lib/chat/context";
+import {
+  buildChatProxyBody,
+  resolveChatScopeForPathname,
+} from "../lib/chat/context";
 import { buildChatScope, buildChatScopeLabel } from "../lib/chat/thread";
 
 test("labels a candidate job scope clearly", () => {
@@ -44,4 +47,19 @@ test("chat proxy body includes the active structured scope", () => {
   assert.deepEqual(body.scope, scope);
   assert.equal(body.memory.thread, scope.threadId);
   assert.equal(body.memory.resource, scope.resourceKey);
+});
+
+test("candidate profile path requests self-profile without browser-owned ids", () => {
+  const scope = resolveChatScopeForPathname({
+    role: "candidate",
+    pathname: "/candidate/profile",
+    candidateProfileLabel: "M. Zaky Arisandhi",
+  });
+
+  assert.deepEqual(scope, {
+    role: "candidate",
+    resourceType: "candidate",
+    resourceId: undefined,
+    resourceLabel: "M. Zaky Arisandhi",
+  });
 });

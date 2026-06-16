@@ -5,8 +5,12 @@ import * as React from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { useAccessToken } from "@/lib/auth/use-access-token";
+import { PRIVY_ENABLED } from "@/lib/auth/use-auth";
+import { saveProfile } from "@/lib/profile-client";
 import { candidateProfileSchema, type CandidateProfileValues } from "@/lib/schemas";
 import { useShireStore } from "@/lib/store";
+import type { CandidateProfile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,32 +47,37 @@ const EXPERIENCE = ["INTERN", "JUNIOR", "MID", "SENIOR", "LEAD"] as const;
 export function CandidateProfileForm({
   redirectTo,
   draft,
+  initialProfile,
 }: {
   redirectTo?: string;
   draft?: CandidateProfileValues | null;
+  initialProfile?: CandidateProfile | null;
 }) {
   const router = useRouter();
+  const accessToken = useAccessToken();
   const existing = useShireStore((s) => s.candidateProfile);
   const save = useShireStore((s) => s.saveCandidateProfile);
+  const [saving, setSaving] = React.useState(false);
+  const current = initialProfile ?? existing;
 
   const form = useForm<CandidateProfileValues>({
     // zod defaults make input ≠ output; pin the resolver to the output type (RHF v7 + resolvers v5).
     resolver: zodResolver(candidateProfileSchema) as Resolver<CandidateProfileValues>,
     defaultValues: {
-      displayName: existing?.displayName ?? "",
-      bio: existing?.bio ?? "",
-      skills: existing?.skills ?? [],
-      roleTargets: existing?.roleTargets ?? [],
-      experienceLevel: existing?.experienceLevel ?? "JUNIOR",
-      portfolioUrl: existing?.portfolioUrl ?? "",
-      githubUrl: existing?.githubUrl ?? "",
-      linkedinUrl: existing?.linkedinUrl ?? "",
-      xUrl: existing?.xUrl ?? "",
-      location: existing?.location ?? "",
-      timezone: existing?.timezone ?? "",
-      languages: existing?.languages ?? ["English"],
-      salaryExpectation: existing?.salaryExpectation ?? "",
-      visibility: existing?.visibility ?? "PUBLIC",
+      displayName: current?.displayName ?? "",
+      bio: current?.bio ?? "",
+      skills: current?.skills ?? [],
+      roleTargets: current?.roleTargets ?? [],
+      experienceLevel: current?.experienceLevel ?? "JUNIOR",
+      portfolioUrl: current?.portfolioUrl ?? "",
+      githubUrl: current?.githubUrl ?? "",
+      linkedinUrl: current?.linkedinUrl ?? "",
+      xUrl: current?.xUrl ?? "",
+      location: current?.location ?? "",
+      timezone: current?.timezone ?? "",
+      languages: current?.languages ?? ["English"],
+      salaryExpectation: current?.salaryExpectation ?? "",
+      visibility: current?.visibility ?? "PUBLIC",
     },
   });
 
@@ -78,16 +87,53 @@ export function CandidateProfileForm({
     }
   }, [draft, form]);
 
-  function onSubmit(values: CandidateProfileValues) {
-    save({
+  React.useEffect(() => {
+    if (!draft && initialProfile) {
+      form.reset({
+        ...initialProfile,
+        portfolioUrl: initialProfile.portfolioUrl ?? "",
+        githubUrl: initialProfile.githubUrl ?? "",
+        linkedinUrl: initialProfile.linkedinUrl ?? "",
+        xUrl: initialProfile.xUrl ?? "",
+        location: initialProfile.location ?? "",
+        timezone: initialProfile.timezone ?? "",
+        salaryExpectation: initialProfile.salaryExpectation ?? "",
+      });
+    }
+  }, [draft, form, initialProfile]);
+
+  async function onSubmit(values: CandidateProfileValues) {
+    const normalized = {
       ...values,
       portfolioUrl: values.portfolioUrl || undefined,
       githubUrl: values.githubUrl || undefined,
       linkedinUrl: values.linkedinUrl || undefined,
       xUrl: values.xUrl || undefined,
-    });
-    toast.success("Profile saved", { description: "AI will use this to match you to roles." });
-    if (redirectTo) router.push(redirectTo);
+    };
+
+    setSaving(true);
+    try {
+      if (PRIVY_ENABLED) {
+        const token = await accessToken();
+        const persisted = await saveProfile<CandidateProfile>(
+          "candidate",
+          normalized,
+          token,
+        );
+        save(persisted);
+      } else {
+        save(normalized);
+      }
+      toast.success("Profile saved", { description: "AI will use this to match you to roles." });
+      if (redirectTo) router.push(redirectTo);
+    } catch (error) {
+      toast.error("Profile was not saved", {
+        description:
+          error instanceof Error ? error.message : "Try again in a moment.",
+      });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -288,8 +334,8 @@ export function CandidateProfileForm({
         />
 
         <div className="flex justify-end gap-2">
-          <Button type="submit" size="lg">
-            Confirm & Save
+          <Button type="submit" size="lg" disabled={saving}>
+            {saving ? "Saving..." : "Confirm & Save"}
           </Button>
         </div>
       </form>

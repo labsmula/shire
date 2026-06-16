@@ -7,7 +7,9 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "node --import tsx --test test/*.test.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config=drizzle.migrate.config.ts"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.14.16",
@@ -19,10 +21,12 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.17.0",
     "motion": "^12.40.0",
     "next": "latest",
     "next-themes": "^0.4.6",
+    "postgres": "^3.4.9",
     "radix-ui": "^1.5.0",
     "react": "latest",
     "react-dom": "latest",
@@ -40,6 +44,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "latest",
     "postcss": "^8.4.31",
