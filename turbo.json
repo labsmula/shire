@@ -3,18 +3,19 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "coverage/**"]
+      "outputs": ["dist/**", ".next/**", "coverage/**"],
+      "env": [
+        "NEXT_PUBLIC_PRIVY_APP_ID",
+        "PRIVY_APP_SECRET",
+        "SHIRE_AGENT_CHAT_URL",
+        "SHIRE_AGENT_INTERNAL_URL",
+        "SHIRE_AGENT_SERVICE_TOKEN",
+        "DATABASE_URL",
+        "DIRECT_DATABASE_URL"
+      ]
     },
-    "dev": {
-      "cache": false,
-      "persistent": true
-    },
-    "lint": {
-      "dependsOn": ["^lint"]
-    },
-    "typecheck": {
-      "dependsOn": ["^typecheck"],
-      "outputs": []
-    }
+    "dev": { "cache": false, "persistent": true },
+    "lint": { "dependsOn": ["^lint"] },
+    "typecheck": { "dependsOn": ["^typecheck"], "outputs": [] }
   }
 }
