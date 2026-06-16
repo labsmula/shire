@@ -300,7 +300,8 @@ Privy or Supabase.
 - [ ] **Step 2: Run route tests and verify RED**
 
 ```powershell
-node --import tsx --test apps/web/test/profile-route.test.ts
+Set-Location apps/web
+node --import tsx --test test/profile-route.test.ts
 ```
 
 Expected: FAIL because handlers do not exist.
@@ -369,7 +370,8 @@ drafts, candidate profiles, and chat identity attached to one internal user.
 - [ ] **Step 6: Verify**
 
 ```powershell
-node --import tsx --test apps/web/test/profile-route.test.ts apps/web/test/cv-route.test.ts
+Set-Location apps/web
+node --import tsx --test test/profile-route.test.ts test/cv-route.test.ts
 npm.cmd run test --workspace=@shire/web
 npm.cmd run typecheck --workspace=@shire/web
 ```
