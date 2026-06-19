@@ -38,9 +38,12 @@ const recruiterProfile = {
   location: "",
 } as const;
 
-function authenticated(privyUserId = "did:privy:user-1") {
+function authenticated(
+  privyUserId = "did:privy:user-1",
+  walletAddress?: string,
+) {
   return async () =>
-    ({ mode: "privy", privyUserId }) as const;
+    ({ mode: "privy", privyUserId, walletAddress }) as const;
 }
 
 function jsonRequest(method: string, body?: unknown) {
@@ -85,6 +88,23 @@ test("candidate PUT persists a validated profile for the verified user", async (
       xUrl: undefined,
     },
   );
+});
+
+test("candidate PUT persists the verified wallet address on the user", async () => {
+  const repository = createInMemoryProfileRepository();
+  const handlers = createProfileRouteHandlers("candidate", {
+    resolveAuthenticatedUser: authenticated(
+      "did:privy:user-1",
+      "0x1234567890abcdef1234567890abcdef12345678",
+    ),
+    repository,
+  });
+
+  const response = await handlers.PUT(jsonRequest("PUT", candidateProfile));
+
+  assert.equal(response.status, 200);
+  const user = await repository.resolveUser("did:privy:user-1");
+  assert.equal(user.walletAddress, "0x1234567890abcdef1234567890abcdef12345678");
 });
 
 test("recruiter PUT activates a second role for the same user", async () => {
