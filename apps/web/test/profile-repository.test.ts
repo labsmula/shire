@@ -267,7 +267,7 @@ test("Drizzle atomic profile save rolls back when the profile upsert fails", asy
   let transactionCalls = 0;
   const transactionStore: ProfileTransactionStore = {
     async resolveUser(privyUserId) {
-      return { id: "user-1", privyUserId, onboardingDone: false };
+      return { id: "user-1", privyUserId, walletAddress: null, onboardingDone: false };
     },
     async upsertProfile() {
       throw new Error("profile write failed");
@@ -317,7 +317,7 @@ test("Drizzle atomic profile save uses one transaction store for both writes", a
       operation({
         async resolveUser(privyUserId) {
           calls.push(`user:${privyUserId}`);
-          return { id: "user-1", privyUserId, onboardingDone: false };
+          return { id: "user-1", privyUserId, walletAddress: null, onboardingDone: false };
         },
         async upsertProfile(userId, role, profile) {
           calls.push(`profile:${userId}:${role}`);
@@ -325,7 +325,12 @@ test("Drizzle atomic profile save uses one transaction store for both writes", a
         },
         async markOnboardingDone(userId) {
           calls.push(`onboarding:${userId}`);
-          return { id: userId, privyUserId: "did:privy:query", onboardingDone: true };
+          return {
+            id: userId,
+            privyUserId: "did:privy:query",
+            walletAddress: null,
+            onboardingDone: true,
+          };
         },
       }),
   });
@@ -342,7 +347,12 @@ test("Drizzle atomic profile save uses one transaction store for both writes", a
     "onboarding:user-1",
   ]);
   assert.deepEqual(saved, {
-    user: { id: "user-1", privyUserId: "did:privy:query", onboardingDone: true },
+    user: {
+      id: "user-1",
+      privyUserId: "did:privy:query",
+      walletAddress: null,
+      onboardingDone: true,
+    },
     profile: { company: "Shire" },
   });
 });

@@ -1,12 +1,13 @@
 import { Navbar } from "@/components/marketing/navbar";
 import { Hero } from "@/components/marketing/hero";
 import { Logos } from "@/components/marketing/logos";
-import { Stats } from "@/components/marketing/stats";
-import { Steps } from "@/components/marketing/steps";
 import { Features } from "@/components/marketing/features";
-import { Testimonials } from "@/components/marketing/testimonials";
-import { Integrations } from "@/components/marketing/integrations";
+import { Stats } from "@/components/marketing/stats";
+import { FeaturedQuote } from "@/components/marketing/featured-quote";
+import { StakeFlow } from "@/components/marketing/stake-flow";
+import { Metrics } from "@/components/marketing/metrics";
 import { StakeModel } from "@/components/marketing/stake-model";
+import { Testimonials } from "@/components/marketing/testimonials";
 import { Faq } from "@/components/marketing/faq";
 import { Cta } from "@/components/marketing/cta";
 import { Footer } from "@/components/marketing/footer";
@@ -18,12 +19,13 @@ export default function Page() {
       <main className="flex-1">
         <Hero />
         <Logos />
-        <Stats />
-        <Steps />
         <Features />
-        <Testimonials />
-        <Integrations />
+        <Stats />
+        <FeaturedQuote />
+        <StakeFlow />
+        <Metrics />
         <StakeModel />
+        <Testimonials />
         <Faq />
         <Cta />
       </main>

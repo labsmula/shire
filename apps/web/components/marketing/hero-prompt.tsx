@@ -30,7 +30,7 @@ export function HeroPrompt() {
   return (
     <form
       onSubmit={onSubmit}
-      className="mx-auto w-full max-w-2xl rounded-2xl border border-white/10 bg-white/[0.04] p-2 shadow-2xl shadow-black/30 backdrop-blur"
+      className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-card p-2 shadow-lg shadow-foreground/5"
     >
       <div className="flex items-center gap-1 p-1" role="tablist" aria-label="Search mode">
         {(
@@ -62,7 +62,7 @@ export function HeroPrompt() {
       </div>
 
       <div className="flex flex-col gap-2 p-1 sm:flex-row sm:items-center">
-        <div className="flex flex-1 items-center gap-2 rounded-xl bg-background/60 px-3">
+        <div className="flex flex-1 items-center gap-2 rounded-xl bg-muted px-3">
           <Search className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <label htmlFor="hero-query" className="sr-only">
             {mode === "job" ? "Describe the job you want" : "Describe the talent you need"}

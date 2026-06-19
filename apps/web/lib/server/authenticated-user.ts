@@ -1,5 +1,4 @@
 import { PrivyClient } from "@privy-io/node";
-import type { LinkedAccount, User } from "@privy-io/node/resources/users";
 
 export class AuthenticatedUserError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -26,6 +25,15 @@ export type AuthenticatedUserDependencies = {
   verifyAccessToken?: (token: string) => Promise<{ userId: string; walletAddress?: string }>;
 };
 
+type PrivyLinkedAccount = {
+  type?: string;
+  address?: unknown;
+};
+
+type PrivyUserLike = {
+  linked_accounts?: PrivyLinkedAccount[];
+};
+
 function bearerToken(request: Request) {
   const authorization = request.headers.get("authorization");
   if (!authorization) {
@@ -36,15 +44,17 @@ function bearerToken(request: Request) {
   return match?.[1];
 }
 
-function walletAddressFromUser(user: User) {
-  const wallet = user.linked_accounts.find(
-    (account): account is Extract<LinkedAccount, { type: "wallet" }> =>
+function walletAddressFromUser(user: PrivyUserLike): string | undefined {
+  const wallet = user.linked_accounts?.find(
+    (account) =>
       account.type === "wallet" &&
-      "address" in account &&
       typeof account.address === "string" &&
       account.address.trim().length > 0,
   );
-  return wallet?.address;
+  if (typeof wallet?.address !== "string") {
+    return undefined;
+  }
+  return wallet.address;
 }
 
 export async function resolveAuthenticatedUser(
