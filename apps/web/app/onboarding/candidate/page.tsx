@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AlertCircle } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 import { useAccessToken } from "@/lib/auth/use-access-token";
 import { PRIVY_ENABLED } from "@/lib/auth/use-auth";
@@ -12,8 +13,9 @@ import { AuthShell } from "@/components/layout/auth-shell";
 import { CandidateCvUpload } from "@/components/profile/candidate-cv-upload";
 import { CandidateProfileForm } from "@/components/profile/candidate-profile-form";
 
-export default function OnboardingCandidatePage() {
+function CandidateOnboardingContent() {
   const accessToken = useAccessToken();
+  const searchParams = useSearchParams();
   const [draft, setDraft] = React.useState<CandidateProfile | null>(null);
   const [initialProfile, setInitialProfile] = React.useState<CandidateProfile | null>(null);
   const [loading, setLoading] = React.useState(PRIVY_ENABLED);
@@ -52,6 +54,10 @@ export default function OnboardingCandidatePage() {
     };
   }, [accessToken]);
 
+  const redirectTo = searchParams.get("next") === "/onboarding/recruiter"
+    ? "/onboarding/recruiter"
+    : "/candidate";
+
   return (
     <AuthShell back={{ href: "/onboarding", label: "Back" }} step="2 of 3">
       <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
@@ -75,7 +81,7 @@ export default function OnboardingCandidatePage() {
             <div className="space-y-6">
               <CandidateCvUpload onDraft={setDraft} />
               <CandidateProfileForm
-                redirectTo="/candidate"
+                redirectTo={redirectTo}
                 draft={draft}
                 initialProfile={initialProfile}
               />
@@ -84,5 +90,21 @@ export default function OnboardingCandidatePage() {
         </div>
       </div>
     </AuthShell>
+  );
+}
+
+export default function OnboardingCandidatePage() {
+  return (
+    <React.Suspense
+      fallback={
+        <AuthShell back={{ href: "/onboarding", label: "Back" }} step="2 of 3">
+          <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
+            Loading profile...
+          </div>
+        </AuthShell>
+      }
+    >
+      <CandidateOnboardingContent />
+    </React.Suspense>
   );
 }

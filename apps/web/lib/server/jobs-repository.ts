@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 
 import type { ExperienceLevel, JobStatus, JobType, RiskLevel, TokenSymbol } from "../types";
 import { createDatabase, type Database } from "./db";
@@ -45,7 +45,7 @@ export type CreateJobInput = {
 export interface JobsRepository {
   createJob(recruiterUserId: string, input: CreateJobInput): Promise<PersistedJob>;
   listJobsByRecruiter(recruiterUserId: string): Promise<PersistedJob[]>;
-  listActiveJobs(): Promise<PersistedJob[]>;
+  listActiveJobs(options?: { excludeRecruiterUserId?: string }): Promise<PersistedJob[]>;
   getJob(id: string): Promise<PersistedJob | null>;
   updateJobStatus(id: string, status: JobStatus): Promise<PersistedJob>;
 }
@@ -143,12 +143,19 @@ export function createDrizzleJobsRepository(database: Database = createDatabase(
         throw new JobsRepositoryError("Failed to list recruiter jobs.", { cause: error });
       }
     },
-    async listActiveJobs() {
+    async listActiveJobs(options) {
       try {
         const rows = await database
           .select()
           .from(jobs)
-          .where(eq(jobs.status, "ACTIVE"))
+          .where(
+            options?.excludeRecruiterUserId
+              ? and(
+                  eq(jobs.status, "ACTIVE"),
+                  ne(jobs.recruiterUserId, options.excludeRecruiterUserId),
+                )
+              : eq(jobs.status, "ACTIVE"),
+          )
           .orderBy(desc(jobs.createdAt));
         return rows.map(mapJob);
       } catch (error) {
@@ -223,8 +230,14 @@ export function createInMemoryJobsRepository(): JobsRepository {
     async listJobsByRecruiter(recruiterUserId) {
       return sorted([...savedJobs.values()].filter((job) => job.recruiterUserId === recruiterUserId));
     },
-    async listActiveJobs() {
-      return sorted([...savedJobs.values()].filter((job) => job.status === "ACTIVE"));
+    async listActiveJobs(options) {
+      return sorted(
+        [...savedJobs.values()].filter(
+          (job) =>
+            job.status === "ACTIVE" &&
+            job.recruiterUserId !== options?.excludeRecruiterUserId,
+        ),
+      );
     },
     async getJob(id) {
       return savedJobs.get(id) ?? null;

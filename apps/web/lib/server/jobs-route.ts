@@ -116,8 +116,10 @@ export function createCandidateJobsRouteHandlers(
 
   async function GET(request: Request) {
     try {
-      await authenticatedUserId(request, authenticate, profiles());
-      return NextResponse.json({ jobs: await jobs().listActiveJobs() });
+      const userId = await authenticatedUserId(request, authenticate, profiles());
+      return NextResponse.json({
+        jobs: await jobs().listActiveJobs({ excludeRecruiterUserId: userId }),
+      });
     } catch (error) {
       return serverErrorResponse(error);
     }

@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   getActiveRoleState,
+  onboardingChoiceDestination,
+  postOnboardingDestination,
   roleDestination,
   switchableRoles,
 } from "../lib/role-client";
@@ -70,4 +72,32 @@ test("missing recruiter profile routes to recruiter onboarding", () => {
 
 test("admin is not exposed as a user-switchable role", () => {
   assert.deepEqual(switchableRoles, ["candidate", "recruiter"]);
+});
+
+test("both onboarding choice continues candidate setup into recruiter setup", () => {
+  assert.equal(onboardingChoiceDestination("both"), "/onboarding/candidate?next=%2Fonboarding%2Frecruiter");
+});
+
+test("single role onboarding choices go directly to that setup", () => {
+  assert.equal(onboardingChoiceDestination("candidate"), "/onboarding/candidate");
+  assert.equal(onboardingChoiceDestination("recruiter"), "/onboarding/recruiter");
+});
+
+test("post onboarding destination prefers active role homes over onboarding", () => {
+  assert.equal(
+    postOnboardingDestination({ candidate: true, recruiter: false }),
+    "/candidate",
+  );
+  assert.equal(
+    postOnboardingDestination({ candidate: false, recruiter: true }),
+    "/recruiter",
+  );
+  assert.equal(
+    postOnboardingDestination({ candidate: true, recruiter: true }),
+    "/candidate",
+  );
+  assert.equal(
+    postOnboardingDestination({ candidate: false, recruiter: false }),
+    null,
+  );
 });
