@@ -3,8 +3,9 @@
 import * as React from "react";
 import {
   Briefcase as BriefcaseIcon,
+  CheckCircle2,
   Lock as LockIcon,
-  Unlock as UnlockIcon,
+  RotateCcw,
   Users as UsersIcon,
 } from "lucide-react";
 import { useReducedMotion } from "motion/react";
@@ -12,51 +13,106 @@ import { SectionHeading } from "@/components/marketing/section-heading";
 import { Reveal } from "@/components/marketing/reveal";
 import { cn } from "@/lib/utils";
 
-type Phase = "match" | "lock" | "release";
-type PhaseIcon = typeof LockIcon;
+type FlowRole = "candidate" | "recruiter";
+type FlowIcon = typeof UsersIcon;
 
-const phases: { id: Phase; label: string; detail: string; icon: PhaseIcon }[] = [
-  {
-    id: "match",
-    label: "Match",
-    detail: "Candidate stakes 250 cUSD when applying to a role.",
-    icon: BriefcaseIcon,
+type FlowStep = {
+  label: string;
+  detail: string;
+  icon: FlowIcon;
+  badge?: string;
+};
+
+const flowCopy: Record<FlowRole, { label: string; description: string; steps: FlowStep[] }> = {
+  candidate: {
+    label: "Candidate",
+    description:
+      "Apply with a refundable stake. Shire holds it during review, then returns it after the application is officially accepted or rejected.",
+    steps: [
+      {
+        label: "Apply",
+        detail: "Candidate applies and stakes 250 cUSD.",
+        icon: UsersIcon,
+        badge: "250 cUSD",
+      },
+      {
+        label: "Escrow",
+        detail: "The stake is locked while the company reviews.",
+        icon: LockIcon,
+      },
+      {
+        label: "Decision",
+        detail: "The company accepts or rejects the application.",
+        icon: BriefcaseIcon,
+      },
+      {
+        label: "Returned",
+        detail: "The stake returns to the candidate after the decision is final.",
+        icon: RotateCcw,
+        badge: "Back to candidate",
+      },
+    ],
   },
-  {
-    id: "lock",
-    label: "Lock",
-    detail: "The stake sits in escrow while the company reviews the application.",
-    icon: LockIcon,
+  recruiter: {
+    label: "Recruiter",
+    description:
+      "Open a role, review candidates who commit with a stake, then make the official decision that releases the escrow.",
+    steps: [
+      {
+        label: "Open role",
+        detail: "Recruiter publishes a role with clear requirements.",
+        icon: BriefcaseIcon,
+      },
+      {
+        label: "Staked apply",
+        detail: "Candidates apply with 250 cUSD committed.",
+        icon: UsersIcon,
+        badge: "250 cUSD",
+      },
+      {
+        label: "Review",
+        detail: "Shire keeps the stake in escrow during review.",
+        icon: LockIcon,
+      },
+      {
+        label: "Finalize",
+        detail: "Accept or reject officially to release the candidate's stake.",
+        icon: CheckCircle2,
+      },
+    ],
   },
-  {
-    id: "release",
-    label: "Release",
-    detail:
-      "Once the application is officially accepted or rejected, the stake returns to the candidate.",
-    icon: UnlockIcon,
-  },
-];
+};
 
 export function StakeFlow() {
   const reduce = useReducedMotion();
-  const [phase, setPhase] = React.useState<Phase>("match");
+  const [role, setRole] = React.useState<FlowRole>("candidate");
+  const [step, setStep] = React.useState(0);
   const [touched, setTouched] = React.useState(false);
+
+  const activeFlow = flowCopy[role];
+
+  React.useEffect(() => {
+    setStep(0);
+  }, [role]);
 
   React.useEffect(() => {
     if (touched || reduce) return;
-    const order: Phase[] = ["match", "lock", "release"];
     const id = window.setInterval(() => {
-      setPhase((current) => order[(order.indexOf(current) + 1) % order.length]);
+      setStep((current) => (current + 1) % activeFlow.steps.length);
     }, 2600);
     return () => window.clearInterval(id);
-  }, [touched, reduce]);
+  }, [activeFlow.steps.length, reduce, touched]);
 
-  function select(id: Phase) {
+  function selectRole(nextRole: FlowRole) {
     setTouched(true);
-    setPhase(id);
+    setRole(nextRole);
+    setStep(0);
   }
 
-  const chipAt = phase === "match" ? "left" : phase === "lock" ? "center" : "right";
+  function selectStep(nextStep: number) {
+    setTouched(true);
+    setStep(nextStep);
+  }
 
   return (
     <section id="how-it-works" className="scroll-mt-20">
@@ -64,20 +120,18 @@ export function StakeFlow() {
         <SectionHeading
           eyebrow="How it works"
           title="Watch a stake move through Shire"
-          description="Candidate stake, escrow review, returned stake - the commitment cycle in three steps. Tap a phase to play it."
+          description="Choose a side and follow the beam. The primary path shows how commitment moves through the product."
         />
 
         <Reveal>
           <div className="mx-auto mt-12 flex max-w-md items-center justify-center gap-2 rounded-full border border-border bg-card p-1.5 shadow-sm">
-            {phases.map((item) => {
-              const active = phase === item.id;
-              const Icon = item.icon;
-
+            {(["candidate", "recruiter"] as const).map((item) => {
+              const active = role === item;
               return (
                 <button
-                  key={item.id}
+                  key={item}
                   type="button"
-                  onClick={() => select(item.id)}
+                  onClick={() => selectRole(item)}
                   aria-pressed={active}
                   className={cn(
                     "inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -86,8 +140,12 @@ export function StakeFlow() {
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  <Icon className="size-4" aria-hidden="true" />
-                  {item.label}
+                  {item === "candidate" ? (
+                    <UsersIcon className="size-4" aria-hidden="true" />
+                  ) : (
+                    <BriefcaseIcon className="size-4" aria-hidden="true" />
+                  )}
+                  {flowCopy[item].label}
                 </button>
               );
             })}
@@ -95,43 +153,29 @@ export function StakeFlow() {
         </Reveal>
 
         <Reveal delay={0.1}>
-          <div className="relative mx-auto mt-12 max-w-4xl rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-10">
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(2rem,0.7fr)_minmax(0,1fr)_minmax(2rem,0.7fr)_minmax(0,1fr)] items-start gap-2 sm:gap-4">
-              <Actor label="Candidate" icon={UsersIcon} active={phase !== "release"} />
-              <Connector active />
-              <EscrowNode active={phase === "lock"} />
-              <Connector active={phase === "lock" || phase === "release"} />
-              <Actor label="Company" icon={BriefcaseIcon} active={phase !== "match"} />
+          <div className="relative mx-auto mt-12 max-w-5xl overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-10">
+            <p className="mx-auto max-w-3xl text-center text-sm leading-6 text-muted-foreground">
+              {activeFlow.description}
+            </p>
+
+            <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-[1fr_0.5fr_1fr_0.5fr_1fr_0.5fr_1fr] md:items-start">
+              {activeFlow.steps.map((item, index) => (
+                <React.Fragment key={item.label}>
+                  <FlowNode
+                    step={item}
+                    active={step === index}
+                    complete={step > index}
+                    onClick={() => selectStep(index)}
+                  />
+                  {index < activeFlow.steps.length - 1 ? (
+                    <AnimatedConnector active={step >= index + 1} paused={Boolean(reduce)} />
+                  ) : null}
+                </React.Fragment>
+              ))}
             </div>
 
-            <div className="relative mt-8 h-10 sm:mt-10">
-              <div
-                className={cn(
-                  "pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 transition-[left] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                  chipAt === "left"
-                    ? "left-[13%]"
-                    : chipAt === "center"
-                      ? "left-1/2 -translate-x-1/2"
-                      : "left-[87%] -translate-x-full",
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-flex whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors duration-500",
-                    phase === "lock"
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : phase === "release"
-                        ? "border-success/40 bg-success/10 text-success"
-                        : "border-border bg-background text-muted-foreground",
-                  )}
-                >
-                  250 cUSD
-                </span>
-              </div>
-            </div>
-
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-              {phases.find((item) => item.id === phase)?.detail}
+            <p className="mt-8 text-center text-sm font-medium text-foreground">
+              {activeFlow.steps[step]?.detail}
             </p>
           </div>
         </Reveal>
@@ -140,59 +184,55 @@ export function StakeFlow() {
   );
 }
 
-function Connector({ active }: { active: boolean }) {
+function FlowNode({
+  step,
+  active,
+  complete,
+  onClick,
+}: {
+  step: FlowStep;
+  active: boolean;
+  complete: boolean;
+  onClick: () => void;
+}) {
+  const Icon = step.icon;
+
   return (
-    <div className="flex h-16 items-center sm:h-20" aria-hidden="true">
-      <div
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-h-32 flex-col items-center justify-start gap-3 rounded-xl px-2 py-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <span
         className={cn(
-          "h-px w-full rounded-full transition-colors duration-300",
-          active ? "bg-primary/40" : "bg-border",
+          "relative grid size-16 place-items-center rounded-2xl border bg-background text-muted-foreground transition-all duration-300 sm:size-20",
+          active && "scale-105 border-primary bg-primary/10 text-primary shadow-lg shadow-primary/15",
+          complete && !active && "border-primary/30 text-primary",
+        )}
+      >
+        <Icon className="size-6 sm:size-7" aria-hidden="true" />
+        {step.badge ? (
+          <span className="absolute -bottom-4 left-1/2 inline-flex -translate-x-1/2 whitespace-nowrap rounded-full border border-primary/30 bg-background px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm">
+            {step.badge}
+          </span>
+        ) : null}
+      </span>
+      <span className="mt-4 text-sm font-semibold text-foreground">{step.label}</span>
+    </button>
+  );
+}
+
+function AnimatedConnector({ active, paused }: { active: boolean; paused: boolean }) {
+  return (
+    <div className="relative flex h-8 items-center md:h-20" aria-hidden="true">
+      <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-border md:left-0 md:top-1/2 md:h-px md:w-full md:translate-x-0 md:-translate-y-1/2" />
+      <span
+        className={cn(
+          "absolute left-1/2 top-0 h-1/2 w-px -translate-x-1/2 bg-primary/70 shadow-[0_0_18px_hsl(var(--primary)/0.7)] md:left-0 md:top-1/2 md:h-px md:w-1/2 md:translate-x-0 md:-translate-y-1/2",
+          active && !paused && "animate-[stake-beam-y_1.7s_ease-in-out_infinite] md:animate-[stake-beam-x_1.7s_ease-in-out_infinite]",
+          active ? "opacity-100" : "opacity-0",
         )}
       />
-    </div>
-  );
-}
-
-function Actor({
-  label,
-  icon: Icon,
-  active,
-}: {
-  label: string;
-  icon: typeof UsersIcon;
-  active: boolean;
-}) {
-  return (
-    <div className="z-20 flex flex-col items-center gap-2">
-      <div
-        className={cn(
-          "grid size-14 place-items-center rounded-2xl border transition-colors duration-300 sm:size-16",
-          active
-            ? "border-primary/40 bg-primary/10 text-primary"
-            : "border-border bg-background text-muted-foreground",
-        )}
-      >
-        <Icon className="size-6" aria-hidden="true" />
-      </div>
-      <span className="text-xs font-medium text-foreground/80 sm:text-sm">{label}</span>
-    </div>
-  );
-}
-
-function EscrowNode({ active }: { active: boolean }) {
-  return (
-    <div className="z-20 flex flex-col items-center gap-2">
-      <div
-        className={cn(
-          "grid size-16 place-items-center rounded-full border-2 transition-all duration-300 sm:size-20",
-          active
-            ? "scale-105 border-primary bg-primary/10 text-primary shadow-lg shadow-primary/20"
-            : "border-border bg-background text-muted-foreground",
-        )}
-      >
-        <LockIcon className="size-6 sm:size-7" aria-hidden="true" />
-      </div>
-      <span className="text-xs font-medium text-foreground/80 sm:text-sm">Escrow</span>
     </div>
   );
 }
