@@ -63,10 +63,10 @@ export function Navbar() {
             className="hidden sm:inline-flex"
             size="sm"
           >
-            <Link href="/dashboard">Log in</Link>
+            <Link href="/connect">Log in</Link>
           </Button>
           <Button asChild size="sm" className="hidden sm:inline-flex">
-            <Link href="/dashboard">Launch app</Link>
+            <Link href="/candidate/jobs">Launch app</Link>
           </Button>
 
           {/* Mobile */}
@@ -101,10 +101,10 @@ export function Navbar() {
               </nav>
               <div className="mt-auto flex flex-col gap-2 p-4">
                 <Button asChild variant="outline">
-                  <Link href="/dashboard">Log in</Link>
+                  <Link href="/connect">Log in</Link>
                 </Button>
                 <Button asChild>
-                  <Link href="/dashboard">Launch app</Link>
+                  <Link href="/candidate/jobs">Launch app</Link>
                 </Button>
               </div>
             </SheetContent>

@@ -14,14 +14,20 @@ import {
   createDrizzleProfileRepository,
   type ProfileRepository,
 } from "./profile-repository";
+import {
+  createDrizzleJobsRepository,
+  type JobsRepository,
+} from "./jobs-repository";
 import { serverErrorResponse } from "./route-errors";
 
 type ResolveAuthenticatedUser = (request: Request) => Promise<AuthenticatedUser>;
 type RouteContext = { params: Promise<{ jobId: string }> };
+type JobRouteContext = { params: Promise<{ id: string }> };
 
 export type ApplicationsRouteDependencies = {
   resolveAuthenticatedUser?: ResolveAuthenticatedUser;
   profileRepository?: ProfileRepository;
+  jobsRepository?: JobsRepository;
   applicationsRepository?: ApplicationsRepository;
 };
 
@@ -44,6 +50,7 @@ export function createApplicationsRouteHandlers(
     dependencies.profileRepository ?? createDrizzleProfileRepository();
   const applications = () =>
     dependencies.applicationsRepository ?? createDrizzleApplicationsRepository();
+  const jobs = () => dependencies.jobsRepository ?? createDrizzleJobsRepository();
 
   async function GET(request: Request) {
     try {
@@ -81,5 +88,24 @@ export function createApplicationsRouteHandlers(
     }
   }
 
-  return { GET, POST };
+  async function GET_JOB(request: Request, context: JobRouteContext) {
+    try {
+      const userId = await authenticatedUserId(request, authenticate, profiles());
+      const { id } = await context.params;
+      const job = await jobs().getJob(id);
+      if (!job) {
+        return NextResponse.json({ error: "job-not-found" }, { status: 404 });
+      }
+      if (job.recruiterUserId !== userId) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+      return NextResponse.json({
+        applications: await applications().listApplicationsByJob(id),
+      });
+    } catch (error) {
+      return serverErrorResponse(error);
+    }
+  }
+
+  return { GET, POST, GET_JOB };
 }

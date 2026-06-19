@@ -4,9 +4,8 @@ import * as React from "react";
 import { CheckCircle2, Loader2, Send, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import type { Job } from "@/lib/types";
-import { ME_CANDIDATE_ID, useShireStore } from "@/lib/store";
-import { computeMatch } from "@/lib/ai";
 import { useWallet } from "@/lib/wallet/use-wallet";
+import { useApplyJob, useMyApplications } from "@/lib/hooks/use-applications";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -19,16 +18,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { MatchScoreBadge } from "@/components/trust/scores";
 import { ApplicationStatusBadge } from "@/components/applications/application-status-badge";
 import { formatToken } from "@/lib/format";
 
 export function ApplyButton({ job, className }: { job: Job; className?: string }) {
-  const candidateProfile = useShireStore((s) => s.candidateProfile);
-  const applyToJob = useShireStore((s) => s.applyToJob);
-  const application = useShireStore((s) =>
-    s.applications.find((a) => a.jobId === job.id && a.candidateId === ME_CANDIDATE_ID),
-  );
+  const { data: applications = [] } = useMyApplications();
+  const applyJob = useApplyJob();
+  const application = applications.find((a) => a.jobId === job.id);
   const { isConnected, connect } = useWallet();
 
   const [open, setOpen] = React.useState(false);
@@ -46,7 +42,6 @@ export function ApplyButton({ job, className }: { job: Job; className?: string }
     );
   }
 
-  const match = computeMatch(job, candidateProfile);
   const needsStake = job.candidateStakeRequired && job.candidateStakeAmount;
 
   async function submit() {
@@ -55,17 +50,26 @@ export function ApplyButton({ job, className }: { job: Job; className?: string }
       return;
     }
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, needsStake ? 1100 : 500));
-    applyToJob(
-      job.id,
-      message.trim() || "I'd love to be considered for this role.",
-      needsStake ? { stakeAmount: job.candidateStakeAmount, token: job.stakeToken } : undefined,
-    );
-    setSubmitting(false);
-    setOpen(false);
-    toast.success("Application sent", {
-      description: needsStake ? `Staked ${formatToken(job.candidateStakeAmount!, job.stakeToken)}.` : undefined,
-    });
+    try {
+      await applyJob.mutateAsync({
+        jobId: job.id,
+        message: message.trim() || "I'd love to be considered for this role.",
+        stakeAmount: needsStake ? job.candidateStakeAmount : undefined,
+      });
+      setOpen(false);
+      toast.success("Application sent", {
+        description: needsStake
+          ? `Recorded ${formatToken(job.candidateStakeAmount!, job.stakeToken)} simulated stake.`
+          : undefined,
+      });
+    } catch (error) {
+      toast.error("Application was not sent", {
+        description:
+          error instanceof Error ? error.message : "Try again in a moment.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -81,16 +85,9 @@ export function ApplyButton({ job, className }: { job: Job; className?: string }
           <DialogDescription>{job.companyName}</DialogDescription>
         </DialogHeader>
 
-        {candidateProfile ? (
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2">
-            <span className="text-sm text-muted-foreground">Your match</span>
-            <MatchScoreBadge score={match.matchScore} />
-          </div>
-        ) : (
-          <p className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-sm text-muted-foreground">
-            Set up your profile first so recruiters and AI can rank your fit.
-          </p>
-        )}
+        <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          Your application will be saved to your account and visible to the recruiter.
+        </p>
 
         <div className="space-y-2">
           <Label htmlFor="apply-message">Message to the recruiter</Label>

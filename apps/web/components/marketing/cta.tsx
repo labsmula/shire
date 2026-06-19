@@ -20,7 +20,7 @@ export function Cta() {
             </p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Button asChild size="lg">
-                <Link href="/dashboard">Get started free</Link>
+                <Link href="/connect">Get started free</Link>
               </Button>
               <Button
                 asChild

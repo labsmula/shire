@@ -2,58 +2,40 @@
 
 import Link from "next/link";
 import { ArrowRight, Briefcase, FileText, Sparkles } from "lucide-react";
-import { useShireStore } from "@/lib/store";
-import { useCandidateApplications, useActiveJobs } from "@/lib/selectors";
-import { computeMatch } from "@/lib/ai";
+import { useCandidateApiJobs } from "@/lib/hooks/use-jobs";
+import { useMyApplications } from "@/lib/hooks/use-applications";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatTile } from "@/components/shared/stat-tile";
 import { JobCard } from "@/components/jobs/job-card";
-import { ApplicationCard } from "@/components/applications/application-card";
+import { ApplicationStatusBadge } from "@/components/applications/application-status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { timeAgo } from "@/lib/format";
 
-function ProfileCompleteness() {
-  const profile = useShireStore((s) => s.candidateProfile);
-  if (!profile) return null;
-
-  const checks = [
-    !!profile.displayName,
-    !!profile.bio,
-    profile.skills.length > 0,
-    profile.roleTargets.length > 0,
-    !!profile.location,
-    !!profile.portfolioUrl || !!profile.githubUrl,
-  ];
-  const pct = Math.round((checks.filter(Boolean).length / checks.length) * 100);
-
+function ProfilePrompt() {
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
-          Profile completeness
+          Candidate profile
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-2xl font-semibold tabular-nums">{pct}%</span>
-          {pct < 100 && (
-            <Button asChild size="sm" variant="outline">
-              <Link href="/candidate/profile">Complete profile</Link>
-            </Button>
-          )}
-        </div>
-        <Progress value={pct} className="h-2" />
+      <CardContent className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Keep your profile current so matching can use real account data.
+        </p>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/candidate/profile">Update profile</Link>
+        </Button>
       </CardContent>
     </Card>
   );
 }
 
 export default function CandidatePage() {
-  const profile = useShireStore((s) => s.candidateProfile);
-  const applications = useCandidateApplications();
-  const allJobs = useActiveJobs();
+  const { data: applications = [], isLoading: applicationsLoading } = useMyApplications();
+  const { data: allJobs = [], isLoading: jobsLoading } = useCandidateApiJobs();
 
   const activeApps = applications.filter(
     (a) => !["HIRED", "REJECTED", "WITHDRAWN"].includes(a.status),
@@ -61,15 +43,12 @@ export default function CandidatePage() {
 
   const recommended = allJobs
     .filter((j) => !applications.some((a) => a.jobId === j.id))
-    .map((j) => ({ job: j, match: computeMatch(j, profile) }))
-    .sort((a, b) => b.match.matchScore - a.match.matchScore)
-    .slice(0, 3)
-    .map(({ job }) => job);
+    .slice(0, 3);
 
   return (
     <div className="space-y-8 p-4 sm:p-6">
       <PageHeader
-        title={profile ? `Welcome back, ${profile.displayName.split(" ")[0]}` : "Candidate hub"}
+        title="Candidate hub"
         description="Your AI-matched job board and application tracker."
       />
 
@@ -85,13 +64,13 @@ export default function CandidatePage() {
           icon={Briefcase}
         />
         <StatTile
-          label="Saved jobs"
-          value={String(useShireStore.getState().savedJobIds.length)}
+          label="New matches"
+          value={String(recommended.length)}
           icon={Sparkles}
         />
       </div>
 
-      <ProfileCompleteness />
+      <ProfilePrompt />
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -102,7 +81,13 @@ export default function CandidatePage() {
             </Link>
           </Button>
         </div>
-        {recommended.length === 0 ? (
+        {jobsLoading ? (
+          <EmptyState
+            icon={Sparkles}
+            title="Loading recommendations"
+            description="Fetching live jobs from the database."
+          />
+        ) : recommended.length === 0 ? (
           <EmptyState
             icon={Sparkles}
             title="No new recommendations"
@@ -126,7 +111,13 @@ export default function CandidatePage() {
             </Link>
           </Button>
         </div>
-        {activeApps.length === 0 ? (
+        {applicationsLoading ? (
+          <EmptyState
+            icon={FileText}
+            title="Loading applications"
+            description="Fetching your applications from the database."
+          />
+        ) : activeApps.length === 0 ? (
           <EmptyState
             icon={FileText}
             title="No active applications"
@@ -140,7 +131,19 @@ export default function CandidatePage() {
         ) : (
           <div className="space-y-2">
             {activeApps.slice(0, 4).map((app) => (
-              <ApplicationCard key={app.id} application={app} />
+              <Link
+                key={app.id}
+                href={`/candidate/jobs/${app.jobId}`}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 transition-[box-shadow] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">Application {app.id.slice(0, 8)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Applied {timeAgo(app.appliedAt)}
+                  </p>
+                </div>
+                <ApplicationStatusBadge status={app.status} />
+              </Link>
             ))}
           </div>
         )}

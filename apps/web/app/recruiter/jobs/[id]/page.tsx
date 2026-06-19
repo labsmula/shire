@@ -4,7 +4,8 @@ import { use } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Users, Zap } from "lucide-react";
-import { useShireStore, getCandidateById, ME_CANDIDATE_ID } from "@/lib/store";
+import { useRecruiterApiJobs, usePublishJob } from "@/lib/hooks/use-jobs";
+import { useJobApplications } from "@/lib/hooks/use-applications";
 import { PageHeader } from "@/components/shared/page-header";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { RiskScoreBadge } from "@/components/trust/scores";
@@ -16,17 +17,9 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { formatToken, initials, timeAgo } from "@/lib/format";
 import { toast } from "sonner";
 import { useState } from "react";
-import type { ApplicationStatus } from "@/lib/types";
 
 export default function RecruiterJobDetailPage({
   params,
@@ -34,13 +27,19 @@ export default function RecruiterJobDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const job = useShireStore((s) => s.jobs.find((j) => j.id === id));
-  const allApplications = useShireStore((s) => s.applications);
-  const applications = allApplications.filter((a) => a.jobId === id);
-  const stakeForJob = useShireStore((s) => s.stakeForJob);
-  const updateStatus = useShireStore((s) => s.updateApplicationStatus);
+  const { data: jobs = [], isLoading } = useRecruiterApiJobs();
+  const job = jobs.find((j) => j.id === id);
+  const { data: applications = [] } = useJobApplications(job?.id);
+  const publishJob = usePublishJob();
   const [stakeOpen, setStakeOpen] = useState(false);
 
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+        <p className="text-sm text-muted-foreground">Loading job...</p>
+      </div>
+    );
+  }
   if (!job) return notFound();
 
   const isDraft = job.status === "DRAFT";
@@ -111,11 +110,7 @@ export default function RecruiterJobDetailPage({
         ) : (
           <div className="space-y-3">
             {applications.map((app) => {
-              const isMe = app.candidateId === ME_CANDIDATE_ID;
-              const candidate = isMe ? null : getCandidateById(app.candidateId);
-              const displayName = isMe
-                ? "You (demo)"
-                : candidate?.displayName ?? "Unknown candidate";
+              const displayName = `Candidate ${app.candidateId.slice(0, 8)}`;
 
               return (
                 <div
@@ -132,40 +127,13 @@ export default function RecruiterJobDetailPage({
                       <p className="font-medium">{displayName}</p>
                       <p className="text-xs text-muted-foreground">
                         Applied {timeAgo(app.appliedAt)}
-                        {app.stakeId && " · Staked"}
+                        {app.stakeId && " - Staked"}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <ApplicationStatusBadge status={app.status} />
                         <MatchScoreBadge score={app.matchScore} />
                       </div>
                     </div>
-                    <Select
-                      value={app.status}
-                      onValueChange={(v) => {
-                        updateStatus(app.id, v as ApplicationStatus);
-                        toast.success("Status updated");
-                      }}
-                    >
-                      <SelectTrigger className="w-36 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(
-                          [
-                            "APPLIED",
-                            "REVIEWED",
-                            "INTERVIEW",
-                            "OFFERED",
-                            "HIRED",
-                            "REJECTED",
-                          ] as ApplicationStatus[]
-                        ).map((s) => (
-                          <SelectItem key={s} value={s} className="text-xs">
-                            {s.charAt(0) + s.slice(1).toLowerCase()}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
 
                   {app.message && (
@@ -194,9 +162,17 @@ export default function RecruiterJobDetailPage({
         refundPolicy="Refunded when the role closes without dispute."
         confirmLabel="Lock stake & activate"
         onConfirm={(amount) => {
-          stakeForJob(job.id, amount, "cUSD");
-          toast.success("Job activated!");
-          setStakeOpen(false);
+          publishJob.mutate(job.id, {
+            onSuccess: () => {
+              toast.success("Job activated with simulated stake", {
+                description: `${formatToken(amount, "cUSD")} recorded for this listing.`,
+              });
+              setStakeOpen(false);
+            },
+            onError: () => {
+              toast.error("Job activation failed");
+            },
+          });
         }}
       />
     </div>

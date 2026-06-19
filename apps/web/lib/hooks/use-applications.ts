@@ -63,6 +63,24 @@ export function useMyApplications() {
   });
 }
 
+export function useJobApplications(jobId: string | undefined) {
+  const getAccessToken = useAccessToken();
+  return useQuery({
+    queryKey: ["applications", "job", jobId],
+    enabled: Boolean(jobId),
+    queryFn: async () => {
+      if (!jobId) {
+        return [];
+      }
+      const accessToken = await getAccessToken();
+      const response = await fetch(`/api/recruiter/jobs/${jobId}/applications`, {
+        headers: authorizationHeaders(accessToken),
+      });
+      return (await readApplicationsResponse(response)) as Application[];
+    },
+  });
+}
+
 export function useApplyJob() {
   const queryClient = useQueryClient();
   const getAccessToken = useAccessToken();

@@ -91,3 +91,40 @@ test("candidate applications GET lists only the authenticated candidate", async 
     applications: JSON.parse(JSON.stringify([ownApplication])),
   });
 });
+
+test("recruiter job applications GET requires job ownership", async () => {
+  const profiles = createInMemoryProfileRepository();
+  const jobs = createInMemoryJobsRepository();
+  const recruiter = await profiles.resolveUser("did:privy:recruiter");
+  const otherRecruiter = await profiles.resolveUser("did:privy:other-recruiter");
+  const candidate = await profiles.resolveUser("did:privy:candidate");
+  const ownedJob = await jobs.createJob(recruiter.id, jobPayload);
+  const otherJob = await jobs.createJob(otherRecruiter.id, jobPayload);
+  await jobs.updateJobStatus(ownedJob.id, "ACTIVE");
+  await jobs.updateJobStatus(otherJob.id, "ACTIVE");
+  const applications = createInMemoryApplicationsRepository(jobs);
+  const application = await applications.applyToJob(candidate.id, ownedJob.id, {
+    message: "Candidate application.",
+  });
+  const handlers = createApplicationsRouteHandlers({
+    resolveAuthenticatedUser: authenticated("did:privy:recruiter"),
+    profileRepository: profiles,
+    jobsRepository: jobs,
+    applicationsRepository: applications,
+  });
+
+  const response = await handlers.GET_JOB(
+    jsonRequest("GET", `http://localhost/api/recruiter/jobs/${ownedJob.id}/applications`),
+    { params: Promise.resolve({ id: ownedJob.id }) },
+  );
+  const forbidden = await handlers.GET_JOB(
+    jsonRequest("GET", `http://localhost/api/recruiter/jobs/${otherJob.id}/applications`),
+    { params: Promise.resolve({ id: otherJob.id }) },
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    applications: JSON.parse(JSON.stringify([application])),
+  });
+  assert.equal(forbidden.status, 403);
+});
