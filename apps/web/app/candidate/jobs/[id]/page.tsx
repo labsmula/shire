@@ -4,15 +4,13 @@ import { use } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, MapPin, Clock, DollarSign, Zap } from "lucide-react";
-import { useShireStore, getRecruiterById } from "@/lib/store";
 import { computeMatch, computeRisk, offerSafety, recommendStake } from "@/lib/ai";
+import { useCandidateApiJobs } from "@/lib/hooks/use-jobs";
 import { PageHeader } from "@/components/shared/page-header";
-import { RecruiterTrustCard } from "@/components/trust/recruiter-trust-card";
 import { AiInsightCard } from "@/components/ai/ai-insight-card";
 import { WarningPanel } from "@/components/trust/warning-panel";
 import { StakeRecommendationCard } from "@/components/ai/stake-recommendation-card";
 import { OfferSafetyPanel } from "@/components/ai/offer-safety-panel";
-import { ApplyKitGenerator } from "@/components/ai/apply-kit-generator";
 import { ApplyButton } from "@/components/applications/apply-button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -40,16 +38,21 @@ export default function CandidateJobDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const job = useShireStore((s) => s.jobs.find((j) => j.id === id));
-  const profile = useShireStore((s) => s.candidateProfile);
-  const recruiterProfile = useShireStore((s) => s.recruiterProfile);
+  const { data: jobs = [], isLoading } = useCandidateApiJobs();
+  const job = jobs.find((j) => j.id === id);
 
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+        <p className="text-sm text-muted-foreground">Loading job...</p>
+      </div>
+    );
+  }
   if (!job) return notFound();
 
-  const recruiter = getRecruiterById({ recruiterProfile }, job.recruiterId);
-  const match = computeMatch(job, profile);
-  const risk = computeRisk(job, recruiter);
-  const stake = recommendStake(job, recruiter);
+  const match = computeMatch(job, null);
+  const risk = computeRisk(job, null);
+  const stake = recommendStake(job, null);
   const safety = offerSafety(job);
 
   return (
@@ -117,17 +120,13 @@ export default function CandidateJobDetailPage({
       <Separator />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {profile && <AiInsightCard match={match} />}
+        <AiInsightCard match={match} />
         <WarningPanel risk={risk} />
       </div>
 
       <StakeRecommendationCard rec={stake} />
 
       {safety.flags.length > 0 && <OfferSafetyPanel safety={safety} />}
-
-      {recruiter && <RecruiterTrustCard recruiter={recruiter} />}
-
-      <ApplyKitGenerator job={job} />
     </div>
   );
 }

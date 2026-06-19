@@ -3,33 +3,45 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useShireStore } from "@/lib/store";
 import { JobDraftForm } from "@/components/jobs/job-draft-form";
 import { StakeDialog } from "@/components/stake/stake-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import type { Job } from "@/lib/types";
 import type { JobDraftValues } from "@/lib/schemas";
+import { useCreateJob, usePublishJob } from "@/lib/hooks/use-jobs";
 
 export default function NewJobPage() {
   const router = useRouter();
-  const createJob = useShireStore((s) => s.createJob);
-  const stakeForJob = useShireStore((s) => s.stakeForJob);
+  const createJob = useCreateJob();
+  const publishJob = usePublishJob();
   const [draft, setDraft] = useState<Job | null>(null);
   const [stakeOpen, setStakeOpen] = useState(false);
 
   function handleFormSubmit(values: JobDraftValues) {
-    const job = createJob(values);
-    setDraft(job);
-    setStakeOpen(true);
+    createJob.mutate(values, {
+      onSuccess: (job) => {
+        setDraft(job);
+        setStakeOpen(true);
+      },
+      onError: () => {
+        toast.error("Job could not be saved.");
+      },
+    });
   }
 
   function handleStakeConfirm(amount: number) {
     if (!draft) return;
-    stakeForJob(draft.id, amount, "cUSD");
-    toast.success("Job posted and staked!", {
-      description: `${draft.title} is now live and attracting candidates.`,
+    publishJob.mutate(draft.id, {
+      onSuccess: () => {
+        toast.success("Job posted with simulated stake.", {
+          description: `${draft.title} is live with a ${amount} cUSD simulated stake.`,
+        });
+        router.push(`/recruiter/jobs/${draft.id}`);
+      },
+      onError: () => {
+        toast.error("Job was saved, but activation failed.");
+      },
     });
-    router.push(`/recruiter/jobs/${draft.id}`);
   }
 
   return (
@@ -41,6 +53,9 @@ export default function NewJobPage() {
 
       <div className="rounded-2xl border border-border bg-card p-6">
         <JobDraftForm onSubmit={handleFormSubmit} />
+        {createJob.isPending && (
+          <p className="mt-3 text-sm text-muted-foreground">Saving job...</p>
+        )}
       </div>
 
       {draft && (

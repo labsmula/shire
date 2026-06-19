@@ -27,7 +27,7 @@ export function Faq() {
                 Talk to the team and we&apos;ll walk you through a live hire.
               </p>
               <Button asChild variant="outline" size="sm" className="mt-4">
-                <Link href="/dashboard">Talk to an expert</Link>
+                <Link href="/connect">Talk to an expert</Link>
               </Button>
             </div>
           </div>

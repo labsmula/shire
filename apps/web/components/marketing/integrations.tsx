@@ -19,7 +19,7 @@ export function Integrations() {
             />
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
-                <Link href="/dashboard">Start free trial</Link>
+                <Link href="/connect">Start free trial</Link>
               </Button>
               <Button asChild size="lg" variant="outline">
                 <Link href="#features">Browse integrations</Link>

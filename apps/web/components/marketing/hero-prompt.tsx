@@ -24,7 +24,7 @@ export function HeroPrompt() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    router.push("/dashboard");
+    router.push(mode === "job" ? "/candidate/jobs" : "/recruiter/jobs");
   }
 
   return (

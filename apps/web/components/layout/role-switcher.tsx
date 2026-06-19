@@ -37,8 +37,9 @@ export function RoleSwitcher({ current }: { current: AppRole }) {
   }), [candidateProfile, recruiterProfile]);
   const [privyActiveRoles, setPrivyActiveRoles] =
     React.useState<ActiveRoleState | null>(null);
+  const loadingRoles = PRIVY_ENABLED && privyActiveRoles === null;
   const activeRoles = PRIVY_ENABLED
-    ? privyActiveRoles ?? demoActiveRoles
+    ? privyActiveRoles ?? { candidate: false, recruiter: false }
     : demoActiveRoles;
 
   React.useEffect(() => {
@@ -70,7 +71,7 @@ export function RoleSwitcher({ current }: { current: AppRole }) {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5">
           <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-          {roleMeta[current].label}
+          {loadingRoles ? "Loading roles" : roleMeta[current].label}
           <ChevronsUpDown className="size-3.5 text-muted-foreground" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
@@ -80,9 +81,15 @@ export function RoleSwitcher({ current }: { current: AppRole }) {
         {switchableRoles.map((role) => (
           <DropdownMenuItem
             key={role}
+            disabled={loadingRoles}
             onClick={() => {
+              if (loadingRoles) {
+                return;
+              }
               if (activeRoles[role]) {
-                setActiveRole(role);
+                if (!PRIVY_ENABLED) {
+                  setActiveRole(role);
+                }
               }
               router.push(roleDestination(role, activeRoles));
             }}

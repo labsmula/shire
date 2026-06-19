@@ -1,0 +1,115 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { createInMemoryJobsRepository } from "../lib/server/jobs-repository";
+import type { CreateJobInput } from "../lib/server/jobs-repository";
+import { createJobsRouteHandlers } from "../lib/server/jobs-route";
+import { createInMemoryProfileRepository } from "../lib/server/profile-repository";
+
+function authenticated(privyUserId = "did:privy:recruiter") {
+  return async () => ({ mode: "privy", privyUserId }) as const;
+}
+
+function jsonRequest(method: string, body?: unknown) {
+  return new Request("http://localhost/api/recruiter/jobs", {
+    method,
+    headers: { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+const jobPayload = {
+  title: "Senior Protocol Engineer",
+  description:
+    "Build secure protocol infrastructure and partner with product teams on hiring workflows.",
+  location: "Jakarta",
+  remote: true,
+  salaryRange: "$120k-$160k",
+  jobType: "FULL_TIME",
+  experienceLevel: "SENIOR",
+  skillsRequired: ["TypeScript", "Solidity"],
+  candidateStakeRequired: false,
+} satisfies CreateJobInput;
+
+test("recruiter jobs POST creates a job for the authenticated internal user", async () => {
+  const profiles = createInMemoryProfileRepository();
+  const jobs = createInMemoryJobsRepository();
+  const handlers = createJobsRouteHandlers({
+    resolveAuthenticatedUser: authenticated(),
+    profileRepository: profiles,
+    jobsRepository: jobs,
+  });
+
+  const response = await handlers.POST(jsonRequest("POST", jobPayload));
+
+  assert.equal(response.status, 201);
+  const body = await response.json();
+  const user = await profiles.resolveUser("did:privy:recruiter");
+  assert.equal(body.job.recruiterUserId, user.id);
+  assert.equal(body.job.title, jobPayload.title);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(await jobs.listJobsByRecruiter(user.id))),
+    [body.job],
+  );
+});
+
+test("recruiter jobs GET returns only the authenticated recruiter's jobs", async () => {
+  const profiles = createInMemoryProfileRepository();
+  const jobs = createInMemoryJobsRepository();
+  const user = await profiles.resolveUser("did:privy:recruiter");
+  const other = await profiles.resolveUser("did:privy:other");
+  const ownJob = await jobs.createJob(user.id, jobPayload);
+  await jobs.createJob(other.id, { ...jobPayload, title: "Other Job" });
+  const handlers = createJobsRouteHandlers({
+    resolveAuthenticatedUser: authenticated(),
+    profileRepository: profiles,
+    jobsRepository: jobs,
+  });
+
+  const response = await handlers.GET(jsonRequest("GET"));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    jobs: JSON.parse(JSON.stringify([ownJob])),
+  });
+});
+
+test("recruiter jobs POST rejects invalid payloads", async () => {
+  const handlers = createJobsRouteHandlers({
+    resolveAuthenticatedUser: authenticated(),
+    profileRepository: createInMemoryProfileRepository(),
+    jobsRepository: createInMemoryJobsRepository(),
+  });
+
+  const response = await handlers.POST(jsonRequest("POST", { title: "x" }));
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "invalid-job" });
+});
+
+test("recruiter jobs PATCH updates only the authenticated recruiter's job", async () => {
+  const profiles = createInMemoryProfileRepository();
+  const jobs = createInMemoryJobsRepository();
+  const user = await profiles.resolveUser("did:privy:recruiter");
+  const other = await profiles.resolveUser("did:privy:other");
+  const ownJob = await jobs.createJob(user.id, jobPayload);
+  const otherJob = await jobs.createJob(other.id, jobPayload);
+  const handlers = createJobsRouteHandlers({
+    resolveAuthenticatedUser: authenticated(),
+    profileRepository: profiles,
+    jobsRepository: jobs,
+  });
+
+  const response = await handlers.PATCH(
+    jsonRequest("PATCH", { status: "ACTIVE" }),
+    { params: Promise.resolve({ id: ownJob.id }) },
+  );
+  const forbidden = await handlers.PATCH(
+    jsonRequest("PATCH", { status: "ACTIVE" }),
+    { params: Promise.resolve({ id: otherJob.id }) },
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).job.status, "ACTIVE");
+  assert.equal(forbidden.status, 403);
+});

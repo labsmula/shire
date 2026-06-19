@@ -91,3 +91,19 @@ export const jobDraftSchema = z.object({
 });
 
 export type JobDraftValues = z.output<typeof jobDraftSchema>;
+
+export const applyJobSchema = z.strictObject({
+  message: z.string().min(10, "Add a short note for the recruiter").max(1000),
+  stakeAmount: z.coerce.number().min(0).optional(),
+  stakeTx: z.string().min(1).optional(),
+});
+
+export type ApplyJobValues = z.output<typeof applyJobSchema>;
+
+export const setActiveModeSchema = z.strictObject({
+  activeMode: z.enum(["CANDIDATE", "RECRUITER", "BOTH"]),
+});
+
+export const selectModeSchema = z.strictObject({
+  mode: z.enum(["CANDIDATE", "RECRUITER", "BOTH"]),
+});

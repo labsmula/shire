@@ -8,6 +8,13 @@
       "when": 1781538496107,
       "tag": "0000_privy_role_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781860458315,
+      "tag": "0001_web2_crud_security",
+      "breakpoints": true
     }
   ]
 }

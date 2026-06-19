@@ -1,16 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { Zap } from "lucide-react";
-import { useRecruiterStakes } from "@/lib/selectors";
-import { useShireStore } from "@/lib/store";
 import { PageHeader } from "@/components/shared/page-header";
-import { StakeHistoryCard } from "@/components/stake/stake-history-card";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
 
 export default function RecruiterStakesPage() {
-  const stakes = useRecruiterStakes();
-  const jobs = useShireStore((s) => s.jobs);
-
   return (
     <div className="space-y-6 p-4 sm:p-6">
       <PageHeader
@@ -18,22 +14,16 @@ export default function RecruiterStakesPage() {
         description="Escrow records for your job postings."
       />
 
-      {stakes.length === 0 ? (
-        <EmptyState
-          icon={Zap}
-          title="No stake history"
-          description="Stake a job to start — records appear here."
-        />
-      ) : (
-        <div className="space-y-2">
-          {stakes.map((stake) => {
-            const job = jobs.find((j) => j.id === stake.jobId);
-            return (
-              <StakeHistoryCard key={stake.id} stake={stake} jobTitle={job?.title} />
-            );
-          })}
-        </div>
-      )}
+      <EmptyState
+        icon={Zap}
+        title="No stake history"
+        description="Stake records will appear here after escrow persistence is connected."
+        action={
+          <Button asChild size="sm">
+            <Link href="/recruiter/jobs">View jobs</Link>
+          </Button>
+        }
+      />
     </div>
   );
 }

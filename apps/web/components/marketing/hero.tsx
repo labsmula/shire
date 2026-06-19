@@ -52,7 +52,7 @@ export function Hero() {
             {heroChips.map((chip) => (
               <Link
                 key={chip}
-                href="/dashboard"
+                href="/candidate/jobs"
                 className="rounded-full border border-white/12 bg-white/[0.03] px-3 py-1 text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {chip}
@@ -79,7 +79,7 @@ export function Hero() {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Button asChild size="lg">
-              <Link href="/dashboard">Get started — it&apos;s free</Link>
+              <Link href="/connect">Get started — it&apos;s free</Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-white/20 bg-white/5">
               <Link href="#how-it-works">See how it works</Link>

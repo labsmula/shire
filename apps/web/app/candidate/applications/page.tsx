@@ -1,15 +1,17 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import { useCandidateApplications } from "@/lib/selectors";
+import { useMyApplications } from "@/lib/hooks/use-applications";
 import { PageHeader } from "@/components/shared/page-header";
-import { ApplicationCard } from "@/components/applications/application-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ApplicationStatusBadge } from "@/components/applications/application-status-badge";
+import { MatchScoreBadge } from "@/components/trust/scores";
+import { timeAgo } from "@/lib/format";
 
 export default function CandidateApplicationsPage() {
-  const applications = useCandidateApplications();
+  const { data: applications = [], isLoading, isError } = useMyApplications();
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
@@ -18,7 +20,19 @@ export default function CandidateApplicationsPage() {
         description={`${applications.length} total`}
       />
 
-      {applications.length === 0 ? (
+      {isLoading ? (
+        <EmptyState
+          icon={FileText}
+          title="Loading applications"
+          description="Fetching your saved applications from the database."
+        />
+      ) : isError ? (
+        <EmptyState
+          icon={FileText}
+          title="Applications unavailable"
+          description="We could not load your applications. Try again after refreshing."
+        />
+      ) : applications.length === 0 ? (
         <EmptyState
           icon={FileText}
           title="No applications yet"
@@ -32,7 +46,28 @@ export default function CandidateApplicationsPage() {
       ) : (
         <div className="space-y-2">
           {applications.map((app) => (
-            <ApplicationCard key={app.id} application={app} />
+            <div
+              key={app.id}
+              className="rounded-2xl border border-border bg-card p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <Link
+                    href={`/candidate/jobs/${app.jobId}`}
+                    className="font-medium hover:underline"
+                  >
+                    Application {app.id.slice(0, 8)}
+                  </Link>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Job {app.jobId.slice(0, 8)} - applied {timeAgo(app.appliedAt)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <ApplicationStatusBadge status={app.status} />
+                  <MatchScoreBadge score={app.matchScore} />
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}

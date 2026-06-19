@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { celo, celoAlfajores } from "viem/chains";
 import { useShireStore } from "@/lib/store";
@@ -15,11 +15,26 @@ const APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 function PrivySync() {
   const { ready, authenticated, user } = usePrivy();
   const address = user?.wallet?.address ?? null;
+  const userId = user?.id ?? null;
+  const lastUserId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!ready) return;
-    useShireStore.setState({ address: authenticated ? address : null });
-  }, [ready, authenticated, address]);
+    const userChanged = authenticated && lastUserId.current !== userId;
+    lastUserId.current = authenticated ? userId : null;
+    useShireStore.setState({
+      address: authenticated ? address : null,
+      ...(userChanged || !authenticated
+        ? {
+            candidateProfile: null,
+            recruiterProfile: null,
+            applications: [],
+            savedJobIds: [],
+            activeRole: "candidate",
+          }
+        : {}),
+    });
+  }, [ready, authenticated, address, userId]);
 
   return null;
 }
