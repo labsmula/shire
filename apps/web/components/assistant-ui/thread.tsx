@@ -5,61 +5,359 @@ import {
   ComposerPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  useAuiState,
 } from "@assistant-ui/react";
-import { ArrowUpIcon } from "lucide-react";
+import { AlertCircle, ArrowUpIcon, BotIcon, SparklesIcon, UserIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import AITextLoading from "@/components/kokonutui/ai-text-loading";
+import { cn } from "@/lib/utils";
 
 function UserMessage() {
   return (
     <MessagePrimitive.Root className="flex justify-end">
-      <div className="max-w-[80%] rounded-2xl bg-primary px-4 py-2.5 text-sm text-primary-foreground">
-        <MessagePrimitive.Parts />
+      <div className="max-w-[82%] rounded-2xl bg-primary px-4 py-2.5 text-sm leading-6 text-primary-foreground shadow-sm">
+        <MessagePrimitive.Parts
+          components={{
+            Text: ({ text }) => <span className="whitespace-pre-wrap">{text}</span>,
+          }}
+        />
       </div>
     </MessagePrimitive.Root>
   );
 }
 
 function AssistantMessage() {
+  const error = useAuiState((state) =>
+    state.message.status?.type === "incomplete" &&
+    state.message.status.reason === "error"
+      ? (state.message.status.error ?? "The assistant could not finish this response.")
+      : undefined,
+  );
+
   return (
-    <MessagePrimitive.Root className="flex justify-start">
-      <div className="max-w-[80%] rounded-2xl border border-border bg-background px-4 py-2.5 text-sm text-foreground">
-        <MessagePrimitive.Parts />
+    <MessagePrimitive.Root className="flex justify-start gap-3">
+      <div className="mt-1 grid size-8 shrink-0 place-items-center rounded-full border border-primary/20 bg-primary/10 text-primary">
+        <BotIcon className="size-4" aria-hidden="true" />
+      </div>
+      <div className="max-w-[86%] space-y-2">
+        <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm leading-6 text-foreground shadow-sm">
+          <MessagePrimitive.Parts>
+            {({ part }) => {
+              if (part.type === "text") {
+                if (part.status?.type === "running" && part.text.length === 0) {
+                  return <ThinkingState />;
+                }
+                return <MarkdownText text={part.text} />;
+              }
+
+              if (part.type === "tool-call") {
+                return (
+                  <StatusPanel title="Using a tool" tone="neutral">
+                    Reading page context and preparing the answer.
+                  </StatusPanel>
+                );
+              }
+
+              if (part.type === "reasoning") {
+                return null;
+              }
+
+              return null;
+            }}
+          </MessagePrimitive.Parts>
+        </div>
+
+        {error ? (
+          <StatusPanel title="Assistant response failed" tone="error">
+            {String(error)}
+          </StatusPanel>
+        ) : null}
       </div>
     </MessagePrimitive.Root>
   );
 }
 
 function EmptyThread() {
+  const suggestions = [
+    "Summarize this page",
+    "What should I do next?",
+    "Check this role fit",
+  ];
+
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-      Ask about a role, a candidate, or the current page context.
+    <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-4 text-sm">
+      <div className="flex items-start gap-3">
+        <div className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+          <SparklesIcon className="size-4" aria-hidden="true" />
+        </div>
+        <div className="space-y-3">
+          <div>
+            <p className="font-medium text-foreground">Ask Shire about this page</p>
+            <p className="mt-1 text-muted-foreground">
+              The assistant uses your active role and page context, then answers in a
+              structured format.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {suggestions.map((item) => (
+              <span
+                key={item}
+                className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-// function ThinkingState() {
-//   return (
-//     <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-3">
-//       <AITextLoading
-//         containerClassName="p-0"
-//         className="text-sm font-semibold tracking-wide"
-//         interval={1200}
-//         texts={[
-//           "Thinking...",
-//           "Pulling page context...",
-//           "Checking access...",
-//           "Writing answer...",
-//         ]}
-//       />
-//     </div>
-//   );
-// }
+function ThinkingState() {
+  return (
+    <AITextLoading
+      containerClassName="justify-start p-0"
+      className="text-sm font-semibold tracking-wide text-muted-foreground"
+      interval={1000}
+      texts={[
+        "Reading page context...",
+        "Checking your role...",
+        "Preparing a structured answer...",
+      ]}
+    />
+  );
+}
+
+function StatusPanel({
+  title,
+  tone,
+  children,
+}: {
+  title: string;
+  tone: "neutral" | "error";
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-2 rounded-xl border px-3 py-2 text-xs leading-5",
+        tone === "error"
+          ? "border-destructive/25 bg-destructive/10 text-destructive"
+          : "border-border bg-muted/30 text-muted-foreground",
+      )}
+    >
+      <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+      <div>
+        <p className="font-semibold">{title}</p>
+        <div>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function MarkdownText({ text }: { text: string }) {
+  const blocks = parseMarkdownBlocks(text);
+
+  return (
+    <div className="space-y-3">
+      {blocks.map((block, index) => {
+        if (block.type === "heading") {
+          return (
+            <h3 key={index} className="text-sm font-semibold text-foreground">
+              {renderInlineMarkdown(block.text)}
+            </h3>
+          );
+        }
+        if (block.type === "list") {
+          return (
+            <ul key={index} className="space-y-1.5 pl-4">
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex} className="list-disc marker:text-primary">
+                  {renderInlineMarkdown(item)}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        if (block.type === "quote") {
+          return (
+            <blockquote
+              key={index}
+              className="border-l-2 border-primary/40 pl-3 text-muted-foreground"
+            >
+              {renderInlineMarkdown(block.text)}
+            </blockquote>
+          );
+        }
+        if (block.type === "code") {
+          return (
+            <pre
+              key={index}
+              className="overflow-x-auto rounded-xl border border-border bg-muted/40 p-3 text-xs leading-5"
+            >
+              <code>{block.text}</code>
+            </pre>
+          );
+        }
+        return (
+          <p key={index} className="whitespace-pre-wrap">
+            {renderInlineMarkdown(block.text)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+type MarkdownBlock =
+  | { type: "paragraph"; text: string }
+  | { type: "heading"; text: string }
+  | { type: "list"; items: string[] }
+  | { type: "quote"; text: string }
+  | { type: "code"; text: string };
+
+function parseMarkdownBlocks(text: string): MarkdownBlock[] {
+  const lines = text.split(/\r?\n/);
+  const blocks: MarkdownBlock[] = [];
+  let paragraph: string[] = [];
+  let list: string[] = [];
+  let code: string[] | null = null;
+
+  function flushParagraph() {
+    if (paragraph.length) {
+      blocks.push({ type: "paragraph", text: paragraph.join("\n") });
+      paragraph = [];
+    }
+  }
+
+  function flushList() {
+    if (list.length) {
+      blocks.push({ type: "list", items: list });
+      list = [];
+    }
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+
+    if (line.trim().startsWith("```")) {
+      if (code) {
+        blocks.push({ type: "code", text: code.join("\n") });
+        code = null;
+      } else {
+        flushParagraph();
+        flushList();
+        code = [];
+      }
+      continue;
+    }
+
+    if (code) {
+      code.push(rawLine);
+      continue;
+    }
+
+    if (!line.trim()) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = /^(#{1,3})\s+(.+)$/.exec(line);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "heading", text: heading[2] });
+      continue;
+    }
+
+    const listItem = /^[-*]\s+(.+)$/.exec(line);
+    if (listItem) {
+      flushParagraph();
+      list.push(listItem[1]);
+      continue;
+    }
+
+    const quote = /^>\s?(.+)$/.exec(line);
+    if (quote) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "quote", text: quote[1] });
+      continue;
+    }
+
+    flushList();
+    paragraph.push(line);
+  }
+
+  if (code) blocks.push({ type: "code", text: code.join("\n") });
+  flushParagraph();
+  flushList();
+
+  return blocks.length ? blocks : [{ type: "paragraph", text }];
+}
+
+function renderInlineMarkdown(text: string) {
+  const pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+  const parts = text.split(pattern).filter(Boolean);
+
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code
+          key={index}
+          className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]"
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
+    const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
+    if (link) {
+      const href = safeMarkdownHref(link[2]);
+      if (!href) return link[1];
+
+      return (
+        <a
+          key={index}
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium text-primary underline underline-offset-4"
+        >
+          {link[1]}
+        </a>
+      );
+    }
+
+    return part;
+  });
+}
+
+function safeMarkdownHref(href: string) {
+  const normalized = href.trim();
+  if (
+    normalized.startsWith("https://") ||
+    normalized.startsWith("http://") ||
+    normalized.startsWith("mailto:") ||
+    normalized.startsWith("/") ||
+    normalized.startsWith("#")
+  ) {
+    return normalized;
+  }
+  return undefined;
+}
 
 export function Thread() {
   return (
     <ThreadPrimitive.Root className="flex h-full min-h-0 flex-col">
-      <ThreadPrimitive.Viewport className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+      <ThreadPrimitive.Viewport className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <AuiIf condition={(state) => state.thread.isEmpty}>
           <EmptyThread />
         </AuiIf>
@@ -73,11 +371,15 @@ export function Thread() {
         <ThreadPrimitive.ViewportFooter className="sticky bottom-0 pt-2">
           <ComposerPrimitive.Root className="rounded-2xl border border-border bg-background p-2 shadow-sm">
             <ComposerPrimitive.Input
-              placeholder="Ask the assistant..."
-              className="min-h-11 w-full resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+              placeholder="Ask about this page..."
+              className="min-h-11 w-full resize-none bg-transparent px-3 py-2 text-sm leading-6 outline-none placeholder:text-muted-foreground"
               rows={1}
             />
-            <div className="flex justify-end px-1 pb-1">
+            <div className="flex items-center justify-between gap-2 px-1 pb-1">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <UserIcon className="size-3.5" aria-hidden="true" />
+                Page-aware
+              </div>
               <ComposerPrimitive.Send className="inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40">
                 <ArrowUpIcon className="size-4" />
               </ComposerPrimitive.Send>
