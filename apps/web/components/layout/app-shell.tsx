@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { AppRole } from "@/lib/types";
+import * as React from "react";
+import type { AppRole, CandidateProfile, RecruiterProfile } from "@/lib/types";
+import { getProfile } from "@/lib/profile-client";
+import { PRIVY_ENABLED } from "@/lib/auth/use-auth";
+import { useAccessToken } from "@/lib/auth/use-access-token";
+import { useShireStore } from "@/lib/store";
 import { Logo } from "@/components/site/logo";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { NotificationsMenu } from "@/components/layout/notifications-menu";
@@ -12,9 +17,57 @@ import { NetworkSwitcher } from "@/components/wallet/network-switcher";
 import { navConfig, roleMeta } from "@/components/layout/app-nav";
 import { cn } from "@/lib/utils";
 
+function useAccountLabel(role: AppRole) {
+  const accessToken = useAccessToken();
+  const candidateProfile = useShireStore((s) => s.candidateProfile);
+  const recruiterProfile = useShireStore((s) => s.recruiterProfile);
+  const [label, setLabel] = React.useState(roleMeta[role].label);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadLabel() {
+      if (role === "admin") {
+        setLabel("Admin");
+        return;
+      }
+
+      if (!PRIVY_ENABLED) {
+        setLabel(
+          role === "candidate"
+            ? candidateProfile?.displayName ?? roleMeta[role].label
+            : recruiterProfile?.companyName ?? roleMeta[role].label,
+        );
+        return;
+      }
+
+      try {
+        const token = await accessToken();
+        if (role === "candidate") {
+          const profile = await getProfile<CandidateProfile>("candidate", token);
+          if (!cancelled) setLabel(profile.displayName);
+        } else {
+          const profile = await getProfile<RecruiterProfile>("recruiter", token);
+          if (!cancelled) setLabel(profile.companyName);
+        }
+      } catch {
+        if (!cancelled) setLabel(roleMeta[role].label);
+      }
+    }
+
+    void loadLabel();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, candidateProfile, recruiterProfile, role]);
+
+  return label;
+}
+
 export function AppShell({ role, children }: { role: AppRole; children: React.ReactNode }) {
   const pathname = usePathname();
   const items = navConfig[role];
+  const accountLabel = useAccountLabel(role);
 
   const isActive = (href: string) =>
     href === roleMeta[role].home ? pathname === href : pathname.startsWith(href);
@@ -78,7 +131,11 @@ export function AppShell({ role, children }: { role: AppRole; children: React.Re
             </div>
             <ThemeToggle />
             <NotificationsMenu />
-            <WalletConnectButton size="sm" />
+            <WalletConnectButton
+              size="sm"
+              accountLabel={accountLabel}
+              accountDescription={roleMeta[role].label}
+            />
           </div>
         </header>
 

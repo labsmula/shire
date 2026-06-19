@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, LogOut, Wallet } from "lucide-react";
+import { Loader2, LogOut, UserCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PRIVY_ENABLED, useAuth } from "@/lib/auth/use-auth";
 import { Button } from "@/components/ui/button";
@@ -16,44 +16,47 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { WalletAddressBadge } from "@/components/wallet/wallet-address-badge";
 import { NetworkSwitcher } from "@/components/wallet/network-switcher";
-import { truncateAddress } from "@/lib/format";
 
 export function WalletConnectButton({
   size = "default",
   redirectTo,
+  accountLabel = "Account",
+  accountDescription = "Signed in",
+  className,
 }: {
   size?: "sm" | "default" | "lg";
   redirectTo?: string;
+  accountLabel?: string;
+  accountDescription?: string;
+  className?: string;
 }) {
   const router = useRouter();
   const { address, isConnected, connecting, connect, disconnect } = useAuth();
 
-  // With Privy, login resolves through its own modal — redirect once auth lands.
   useEffect(() => {
     if (PRIVY_ENABLED && redirectTo && isConnected) router.push(redirectTo);
   }, [isConnected, redirectTo, router]);
 
   async function onConnect() {
     await connect();
-    // The demo store resolves synchronously here; Privy shows its own confirmation UI.
     if (!PRIVY_ENABLED) {
-      toast.success("Wallet connected", { description: "MiniPay (Celo Alfajores)" });
+      toast.success("Signed in", { description: "Your account is ready." });
       if (redirectTo) router.push(redirectTo);
     }
   }
 
   if (!isConnected) {
     return (
-      <Button size={size} onClick={onConnect} disabled={connecting}>
+      <Button size={size} onClick={onConnect} disabled={connecting} className={className}>
         {connecting ? (
           <>
             <Loader2 className="size-4 animate-spin" />
-            {PRIVY_ENABLED ? "Signing in…" : "Connecting…"}
+            Signing in...
           </>
         ) : (
           <>
-            <Wallet className="size-4" />
-            {PRIVY_ENABLED ? "Sign in" : "Connect wallet"}
+            <UserCircle className="size-4" />
+            Sign in
           </>
         )}
       </Button>
@@ -63,28 +66,33 @@ export function WalletConnectButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size={size} className="font-mono">
+        <Button variant="outline" size={size} className="max-w-[220px] justify-start gap-2">
           <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
-          {truncateAddress(address)}
+          <span className="truncate">{accountLabel}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel>Wallet</DropdownMenuLabel>
+        <DropdownMenuLabel>
+          <span className="block truncate">{accountLabel}</span>
+          <span className="block truncate text-xs font-normal text-muted-foreground">
+            {accountDescription}
+          </span>
+        </DropdownMenuLabel>
         <div className="flex flex-col gap-2 px-2 py-1.5">
-          <WalletAddressBadge address={address!} />
+          {address ? <WalletAddressBadge address={address} /> : null}
           <NetworkSwitcher />
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
             disconnect();
-            toast("Wallet disconnected");
+            toast("Signed out");
             router.push("/");
           }}
           className="text-destructive focus:text-destructive"
         >
           <LogOut className="size-4" />
-          Disconnect
+          Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

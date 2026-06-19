@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, Loader2, Send, Wallet } from "lucide-react";
+import { CheckCircle2, Loader2, Send, UserCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { Job } from "@/lib/types";
 import { useWallet } from "@/lib/wallet/use-wallet";
@@ -119,7 +119,7 @@ export function ApplyButton({ job, className }: { job: Job; className?: string }
               </>
             ) : !isConnected ? (
               <>
-                <Wallet className="size-4" /> Connect to apply
+                <UserCircle className="size-4" /> Sign in to apply
               </>
             ) : (
               <>

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Loader2, Lock, ShieldCheck, Wallet } from "lucide-react";
+import { Check, Loader2, Lock, ShieldCheck, UserCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { TokenSymbol } from "@/lib/types";
 import { useWallet } from "@/lib/wallet/use-wallet";
@@ -131,7 +131,7 @@ export function StakeDialog({
                 confirmLabel
               ) : (
                 <>
-                  <Wallet className="size-4" /> Connect to stake
+                  <UserCircle className="size-4" /> Sign in to continue
                 </>
               )}
             </Button>

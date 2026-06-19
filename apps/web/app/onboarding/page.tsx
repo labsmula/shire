@@ -30,7 +30,7 @@ const roles = [
     id: "both",
     icon: Users,
     label: "Both",
-    description: "Switch between hiring and applying with one wallet identity.",
+    description: "Switch between hiring and applying with one Shire account.",
   },
 ] as const;
 
