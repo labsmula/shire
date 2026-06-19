@@ -36,6 +36,11 @@ export default function AITextLoading({
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
 
   useEffect(() => {
+    if (texts.length <= 1) {
+      setCurrentTextIndex(0);
+      return;
+    }
+
     const timer = setInterval(() => {
       setCurrentTextIndex((prevIndex) => (prevIndex + 1) % texts.length);
     }, interval);

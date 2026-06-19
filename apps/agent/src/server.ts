@@ -16,6 +16,10 @@ import { classifySecurityIndicator } from "./runtime/security-indicators";
 import { enforceChatRateLimit } from "./runtime/chat-caller";
 import { searchProductKnowledge } from "./runtime/knowledge";
 import { enrichChatRequestWithProductKnowledge } from "./runtime/product-knowledge";
+import {
+  answerProductQuestion,
+  ProductQnaError,
+} from "./runtime/product-qna";
 import { validateChatRequest } from "./runtime/chat-validation";
 import { createInMemoryRateLimiter, type RateLimiter } from "./runtime/rate-limit";
 import { guardSecurityPrompt } from "./runtime/security-guard";
@@ -57,6 +61,7 @@ export type RuntimeHttpServerDependencies = {
   durableJobRuntime?: DurableJobRuntime;
   serviceToken?: string;
   extractCvDocument?: (file: CvDocumentFile | undefined) => Promise<string>;
+  answerProductQuestion?: typeof answerProductQuestion;
 };
 
 export function getRuntimeBootstrapOutput() {
@@ -101,6 +106,7 @@ export async function createRuntimeHttpServer(
   }
 
   const serviceToken = dependencies.serviceToken ?? env.agentServiceToken;
+  const rateLimiter = dependencies.rateLimiter ?? createInMemoryRateLimiter();
   const cvDocumentExtractor =
     dependencies.extractCvDocument ??
     ((file: CvDocumentFile | undefined) =>
@@ -169,6 +175,56 @@ export async function createRuntimeHttpServer(
         response.status(503).json({ status: "queue-unavailable" });
       }
     });
+  });
+
+  app.post("/product-qna", async (request, response) => {
+    if (!isAuthorized(request)) {
+      response.status(401).json({ status: "unauthorized" });
+      return;
+    }
+
+    try {
+      const rateResult = await enforceChatRateLimit(
+        request.body,
+        {
+          rateLimiter,
+          now: dependencies.now,
+          ip: request.ip,
+        },
+        env.chatRateLimitRequests,
+        env.chatRateLimitWindowSeconds * 1000,
+      );
+
+      if (rateResult.allowed === false) {
+        runtimeLogger.warn(
+          {
+            callerKey: rateResult.callerKey,
+            retryAfterSeconds: rateResult.retryAfterSeconds,
+          },
+          "product Q&A request rate limited",
+        );
+        response
+          .status(429)
+          .set("retry-after", rateResult.retryAfterSeconds.toString())
+          .json({ status: "rate-limited" });
+        return;
+      }
+
+      const answer = await (dependencies.answerProductQuestion ??
+        answerProductQuestion)(request.body);
+      response.json(answer);
+    } catch (error) {
+      if (error instanceof ProductQnaError) {
+        response.status(400).json({
+          status: error.code,
+          message: error.message,
+        });
+        return;
+      }
+
+      runtimeLogger.error({ err: error }, "product Q&A failed");
+      response.status(502).json({ status: "product-qna-unavailable" });
+    }
   });
 
   app.post("/jobs", async (request, response) => {
@@ -322,7 +378,6 @@ export async function createRuntimeHttpServer(
     }
 
     // Rate limit
-    const rateLimiter = dependencies.rateLimiter ?? createInMemoryRateLimiter();
     const rateResult = await enforceChatRateLimit(
       request.body,
       {
@@ -475,6 +530,7 @@ export async function createRuntimeHttpServer(
         "/jobs",
         "/jobs/cv-document",
         "/jobs/:jobId",
+        "/product-qna",
         "/chat/:agentId",
       ],
     },

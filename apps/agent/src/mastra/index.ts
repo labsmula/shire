@@ -4,6 +4,10 @@ import { cvProfileAgent } from "./agents/cv-profile.agent";
 import { disputeSummaryAgent } from "./agents/dispute-summary.agent";
 import { jobMatchingAgent } from "./agents/job-matching.agent";
 import {
+  productQnaAgent,
+  productQnaInstructions,
+} from "./agents/product-qna.agent";
+import {
   roleAwareChatAgent,
   roleAwareChatInstructions,
 } from "./agents/role-aware-chat.agent";
@@ -61,6 +65,7 @@ export const mastra = new Mastra({
   agents: {
     cvProfileAgent,
     jobMatchingAgent,
+    productQnaAgent,
     talentMatchingAgent,
     disputeSummaryAgent,
     roleAwareChatAgent,
@@ -77,6 +82,8 @@ export {
   cvProfileAgent,
   disputeSummaryAgent,
   jobMatchingAgent,
+  productQnaAgent,
+  productQnaInstructions,
   roleAwareChatAgent,
   roleAwareChatInstructions,
   talentMatchingAgent,

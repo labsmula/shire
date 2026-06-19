@@ -11,6 +11,7 @@ import { Testimonials } from "@/components/marketing/testimonials";
 import { Faq } from "@/components/marketing/faq";
 import { Cta } from "@/components/marketing/cta";
 import { Footer } from "@/components/marketing/footer";
+import { ProductAssistant } from "@/components/marketing/product-assistant";
 
 export default function Page() {
   return (
@@ -30,6 +31,7 @@ export default function Page() {
         <Cta />
       </main>
       <Footer />
+      <ProductAssistant />
     </div>
   );
 }

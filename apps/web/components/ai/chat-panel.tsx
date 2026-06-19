@@ -3,13 +3,14 @@
 import {
   AssistantModalPrimitive,
   AssistantRuntimeProvider,
+  useAuiState,
 } from "@assistant-ui/react";
 import {
   AssistantChatTransport,
   useChatRuntime,
 } from "@assistant-ui/react-ai-sdk";
 import { useMemo } from "react";
-import { BotIcon } from "lucide-react";
+import { BotIcon, SparklesIcon } from "lucide-react";
 
 import { ChatContextBadge } from "./chat-context-badge";
 import { Thread } from "@/components/assistant-ui/thread";
@@ -60,10 +61,11 @@ export function ChatPanel({
           <AssistantModalPrimitive.Trigger asChild>
             <Button
               aria-label="Open assistant"
-              className="size-14 rounded-full shadow-lg shadow-primary/20 transition-transform hover:scale-105 active:scale-95"
+              className="relative size-14 rounded-full shadow-lg shadow-primary/20 transition-transform hover:scale-105 active:scale-95"
               size="icon"
             >
               <BotIcon className="size-5" />
+              <span className="absolute -right-0.5 -top-0.5 size-3 rounded-full border-2 border-card bg-success" />
             </Button>
           </AssistantModalPrimitive.Trigger>
         </AssistantModalPrimitive.Anchor>
@@ -72,15 +74,7 @@ export function ChatPanel({
           className="z-50 flex h-[min(80vh,42rem)] w-[min(92vw,26rem)] flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-2xl"
           sideOffset={16}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">{title}</p>
-              <p className="text-xs text-muted-foreground">
-                Scope-aware assistant for the current page.
-              </p>
-            </div>
-            <ChatContextBadge label={buildChatContextLabel(scope)} />
-          </div>
+          <ChatPanelHeader title={title} scope={scope} />
 
           <div className="flex-1 overflow-hidden">
             <Thread />
@@ -88,5 +82,30 @@ export function ChatPanel({
         </AssistantModalPrimitive.Content>
       </AssistantModalPrimitive.Root>
     </AssistantRuntimeProvider>
+  );
+}
+
+function ChatPanelHeader({
+  title,
+  scope,
+}: {
+  title: string;
+  scope: ChatScopeRequest;
+}) {
+  const isRunning = useAuiState((state) => state.thread.isRunning);
+
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+      <div className="min-w-0 space-y-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-semibold text-foreground">{title}</p>
+          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <SparklesIcon className="size-3" aria-hidden="true" />
+            {isRunning ? "Thinking" : "Ready"}
+          </span>
+        </div>
+      </div>
+      <ChatContextBadge label={buildChatContextLabel(scope)} />
+    </div>
   );
 }

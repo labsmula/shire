@@ -18,6 +18,7 @@ await Promise.all([
   import("./package-scripts.test"),
   import("./parse-cv-pipeline.test"),
   import("./product-knowledge.test"),
+  import("./product-qna.test"),
   import("./runtime.test"),
   import("./server.test"),
   import("./tools.test"),
