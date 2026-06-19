@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Briefcase } from "lucide-react";
-import { useShireStore } from "@/lib/store";
+import { useCandidateApiJobs } from "@/lib/hooks/use-jobs";
 import { PageHeader } from "@/components/shared/page-header";
 import { JobFilters, type JobFilterState } from "@/components/jobs/job-filters";
 import { JobCard } from "@/components/jobs/job-card";
@@ -16,7 +16,7 @@ const defaultFilters: JobFilterState = {
 };
 
 export default function CandidateJobsPage() {
-  const jobs = useShireStore((s) => s.jobs);
+  const { data: jobs = [], isLoading, isError } = useCandidateApiJobs();
   const [filters, setFilters] = useState<JobFilterState>(defaultFilters);
 
   const visible = useMemo(() => {
@@ -46,7 +46,19 @@ export default function CandidateJobsPage() {
       />
       <JobFilters value={filters} onChange={setFilters} />
 
-      {visible.length === 0 ? (
+      {isLoading ? (
+        <EmptyState
+          icon={Briefcase}
+          title="Loading job feed"
+          description="Fetching active roles from the database."
+        />
+      ) : isError ? (
+        <EmptyState
+          icon={Briefcase}
+          title="Job feed unavailable"
+          description="We could not load active roles. Try again after refreshing."
+        />
+      ) : visible.length === 0 ? (
         <EmptyState
           icon={Briefcase}
           title="No jobs match your filters"

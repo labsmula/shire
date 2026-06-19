@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { Briefcase, Plus } from "lucide-react";
-import { useRecruiterJobs } from "@/lib/selectors";
 import { useShireStore } from "@/lib/store";
+import { useRecruiterApiJobs } from "@/lib/hooks/use-jobs";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatToken, initials, timeAgo } from "@/lib/format";
 
 export default function RecruiterJobsPage() {
-  const jobs = useRecruiterJobs();
+  const { data: jobs = [], isLoading, isError } = useRecruiterApiJobs();
   const applications = useShireStore((s) => s.applications);
 
   return (
@@ -27,7 +27,19 @@ export default function RecruiterJobsPage() {
         </Button>
       </PageHeader>
 
-      {jobs.length === 0 ? (
+      {isLoading ? (
+        <EmptyState
+          icon={Briefcase}
+          title="Loading jobs"
+          description="Fetching your saved job posts from the database."
+        />
+      ) : isError ? (
+        <EmptyState
+          icon={Briefcase}
+          title="Jobs unavailable"
+          description="We could not load your jobs. Try again after refreshing."
+        />
+      ) : jobs.length === 0 ? (
         <EmptyState
           icon={Briefcase}
           title="No jobs yet"
