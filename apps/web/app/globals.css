@@ -263,6 +263,15 @@
   }
 }
 
+@keyframes logo-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

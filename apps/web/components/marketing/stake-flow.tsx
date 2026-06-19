@@ -27,11 +27,11 @@ const flowCopy: Record<FlowRole, { label: string; description: string; steps: Fl
   candidate: {
     label: "Candidate",
     description:
-      "Apply with a refundable stake. Shire holds it during review, then returns it after the application is officially accepted or rejected.",
+      "Candidate stakes when applying. Shire holds it during review, then returns it after the application is officially accepted or rejected.",
     steps: [
       {
-        label: "Apply",
-        detail: "Candidate applies and stakes 250 cUSD.",
+        label: "Apply + stake",
+        detail: "Candidate applies to a role and commits 250 cUSD.",
         icon: UsersIcon,
         badge: "250 cUSD",
       },
@@ -41,12 +41,12 @@ const flowCopy: Record<FlowRole, { label: string; description: string; steps: Fl
         icon: LockIcon,
       },
       {
-        label: "Decision",
+        label: "Company review",
         detail: "The company accepts or rejects the application.",
         icon: BriefcaseIcon,
       },
       {
-        label: "Returned",
+        label: "Stake returned",
         detail: "The stake returns to the candidate after the decision is final.",
         icon: RotateCcw,
         badge: "Back to candidate",
@@ -56,28 +56,29 @@ const flowCopy: Record<FlowRole, { label: string; description: string; steps: Fl
   recruiter: {
     label: "Recruiter",
     description:
-      "Open a role, review candidates who commit with a stake, then make the official decision that releases the escrow.",
+      "Recruiter stakes when opening a role. Shire holds that commitment while the role is active, then resolves it after hiring is finalized.",
     steps: [
       {
-        label: "Open role",
-        detail: "Recruiter publishes a role with clear requirements.",
+        label: "Open + stake",
+        detail: "Recruiter opens a role and commits 250 cUSD.",
         icon: BriefcaseIcon,
-      },
-      {
-        label: "Staked apply",
-        detail: "Candidates apply with 250 cUSD committed.",
-        icon: UsersIcon,
         badge: "250 cUSD",
       },
       {
-        label: "Review",
-        detail: "Shire keeps the stake in escrow during review.",
+        label: "Escrow",
+        detail: "The role stake is locked while the opening is live.",
         icon: LockIcon,
       },
       {
-        label: "Finalize",
-        detail: "Accept or reject officially to release the candidate's stake.",
+        label: "Candidates apply",
+        detail: "Candidates apply and add their own application stakes.",
+        icon: UsersIcon,
+      },
+      {
+        label: "Finalize hire",
+        detail: "Finalize the hiring outcome to resolve the recruiter's stake.",
         icon: CheckCircle2,
+        badge: "Stake resolved",
       },
     ],
   },
@@ -168,7 +169,11 @@ export function StakeFlow() {
                     onClick={() => selectStep(index)}
                   />
                   {index < activeFlow.steps.length - 1 ? (
-                    <AnimatedConnector active={step >= index + 1} paused={Boolean(reduce)} />
+                    <AnimatedConnector
+                      active={step > index}
+                      moving={step === index + 1}
+                      paused={Boolean(reduce)}
+                    />
                   ) : null}
                 </React.Fragment>
               ))}
@@ -211,7 +216,7 @@ function FlowNode({
         )}
       >
         <Icon className="size-6 sm:size-7" aria-hidden="true" />
-        {step.badge ? (
+        {step.badge && active ? (
           <span className="absolute -bottom-4 left-1/2 inline-flex -translate-x-1/2 whitespace-nowrap rounded-full border border-primary/30 bg-background px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm">
             {step.badge}
           </span>
@@ -222,15 +227,28 @@ function FlowNode({
   );
 }
 
-function AnimatedConnector({ active, paused }: { active: boolean; paused: boolean }) {
+function AnimatedConnector({
+  active,
+  moving,
+  paused,
+}: {
+  active: boolean;
+  moving: boolean;
+  paused: boolean;
+}) {
   return (
     <div className="relative flex h-8 items-center md:h-20" aria-hidden="true">
-      <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-border md:left-0 md:top-1/2 md:h-px md:w-full md:translate-x-0 md:-translate-y-1/2" />
+      <span
+        className={cn(
+          "absolute left-1/2 top-0 h-full w-px -translate-x-1/2 md:left-0 md:top-1/2 md:h-px md:w-full md:translate-x-0 md:-translate-y-1/2",
+          active ? "bg-primary/25" : "bg-border",
+        )}
+      />
       <span
         className={cn(
           "absolute left-1/2 top-0 h-1/2 w-px -translate-x-1/2 bg-primary/70 shadow-[0_0_18px_hsl(var(--primary)/0.7)] md:left-0 md:top-1/2 md:h-px md:w-1/2 md:translate-x-0 md:-translate-y-1/2",
-          active && !paused && "animate-[stake-beam-y_1.7s_ease-in-out_infinite] md:animate-[stake-beam-x_1.7s_ease-in-out_infinite]",
-          active ? "opacity-100" : "opacity-0",
+          moving && !paused && "animate-[stake-beam-y_1.7s_ease-in-out_infinite] md:animate-[stake-beam-x_1.7s_ease-in-out_infinite]",
+          moving ? "opacity-100" : "opacity-0",
         )}
       />
     </div>
