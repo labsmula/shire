@@ -11,6 +11,7 @@ export type ActiveRoleState = {
 
 export const switchableRoles = ["candidate", "recruiter"] as const;
 export type SwitchableRole = (typeof switchableRoles)[number];
+export type OnboardingChoice = SwitchableRole | "both";
 
 const roleHomes = {
   candidate: "/candidate",
@@ -55,4 +56,21 @@ export function roleDestination(
   activeRoles: ActiveRoleState,
 ) {
   return activeRoles[role] ? roleHomes[role] : onboardingRoutes[role];
+}
+
+export function onboardingChoiceDestination(choice: OnboardingChoice) {
+  if (choice === "both") {
+    return `${onboardingRoutes.candidate}?next=${encodeURIComponent(onboardingRoutes.recruiter)}`;
+  }
+  return onboardingRoutes[choice];
+}
+
+export function postOnboardingDestination(activeRoles: ActiveRoleState) {
+  if (activeRoles.candidate) {
+    return roleHomes.candidate;
+  }
+  if (activeRoles.recruiter) {
+    return roleHomes.recruiter;
+  }
+  return null;
 }

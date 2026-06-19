@@ -16,13 +16,22 @@ export class AuthenticatedUserConfigurationError extends Error {
 
 export type AuthenticatedUser =
   | { mode: "demo"; privyUserId: "demo-user" }
-  | { mode: "privy"; privyUserId: string };
+  | { mode: "privy"; privyUserId: string; walletAddress?: string };
 
 export type AuthenticatedUserDependencies = {
   appId?: string;
   appSecret?: string;
   nodeEnv?: string;
-  verifyAccessToken?: (token: string) => Promise<{ userId: string }>;
+  verifyAccessToken?: (token: string) => Promise<{ userId: string; walletAddress?: string }>;
+};
+
+type PrivyLinkedAccount = {
+  type?: string;
+  address?: unknown;
+};
+
+type PrivyUserLike = {
+  linked_accounts?: PrivyLinkedAccount[];
 };
 
 function bearerToken(request: Request) {
@@ -33,6 +42,19 @@ function bearerToken(request: Request) {
 
   const match = /^Bearer\s+(\S+)$/i.exec(authorization);
   return match?.[1];
+}
+
+function walletAddressFromUser(user: PrivyUserLike): string | undefined {
+  const wallet = user.linked_accounts?.find(
+    (account) =>
+      account.type === "wallet" &&
+      typeof account.address === "string" &&
+      account.address.trim().length > 0,
+  );
+  if (typeof wallet?.address !== "string") {
+    return undefined;
+  }
+  return wallet.address;
 }
 
 export async function resolveAuthenticatedUser(
@@ -73,15 +95,20 @@ export async function resolveAuthenticatedUser(
     (async (accessToken: string) => {
       const client = new PrivyClient({ appId, appSecret });
       const claims = await client.utils().auth().verifyAccessToken(accessToken);
-      return { userId: claims.user_id };
+      const user = await client.users()._get(claims.user_id);
+      return { userId: claims.user_id, walletAddress: walletAddressFromUser(user) };
     });
 
   try {
-    const { userId } = await verifyAccessToken(token);
+    const { userId, walletAddress } = await verifyAccessToken(token);
     if (!userId?.trim()) {
       throw new Error("Verified token did not include a user ID.");
     }
-    return { mode: "privy", privyUserId: userId };
+    return {
+      mode: "privy",
+      privyUserId: userId,
+      ...(walletAddress ? { walletAddress } : {}),
+    };
   } catch (error) {
     throw new AuthenticatedUserError("Authentication token is invalid.", {
       cause: error,

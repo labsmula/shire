@@ -9,7 +9,6 @@ const marketingFiles = [
   "components/marketing/hero-prompt.tsx",
   "components/marketing/cta.tsx",
   "components/marketing/faq.tsx",
-  "components/marketing/integrations.tsx",
 ];
 
 test("marketing entry points route to existing app paths", () => {

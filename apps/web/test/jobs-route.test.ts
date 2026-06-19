@@ -3,7 +3,10 @@ import test from "node:test";
 
 import { createInMemoryJobsRepository } from "../lib/server/jobs-repository";
 import type { CreateJobInput } from "../lib/server/jobs-repository";
-import { createJobsRouteHandlers } from "../lib/server/jobs-route";
+import {
+  createCandidateJobsRouteHandlers,
+  createJobsRouteHandlers,
+} from "../lib/server/jobs-route";
 import { createInMemoryProfileRepository } from "../lib/server/profile-repository";
 
 function authenticated(privyUserId = "did:privy:recruiter") {
@@ -112,4 +115,27 @@ test("recruiter jobs PATCH updates only the authenticated recruiter's job", asyn
   assert.equal(response.status, 200);
   assert.equal((await response.json()).job.status, "ACTIVE");
   assert.equal(forbidden.status, 403);
+});
+
+test("candidate jobs GET excludes jobs posted by the same user", async () => {
+  const profiles = createInMemoryProfileRepository();
+  const jobs = createInMemoryJobsRepository();
+  const user = await profiles.resolveUser("did:privy:both");
+  const other = await profiles.resolveUser("did:privy:other");
+  const ownJob = await jobs.createJob(user.id, { ...jobPayload, title: "Own Job" });
+  const otherJob = await jobs.createJob(other.id, { ...jobPayload, title: "Other Job" });
+  await jobs.updateJobStatus(ownJob.id, "ACTIVE");
+  const activeOtherJob = await jobs.updateJobStatus(otherJob.id, "ACTIVE");
+  const handlers = createCandidateJobsRouteHandlers({
+    resolveAuthenticatedUser: authenticated("did:privy:both"),
+    profileRepository: profiles,
+    jobsRepository: jobs,
+  });
+
+  const response = await handlers.GET(jsonRequest("GET"));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    jobs: JSON.parse(JSON.stringify([activeOtherJob])),
+  });
 });

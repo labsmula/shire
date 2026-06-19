@@ -17,6 +17,7 @@ import {
 import * as schema from "../lib/server/db/schema";
 import {
   buildProfileUserUpsertQuery,
+  buildProfileUserOnboardingDoneQuery,
   buildRoleProfileUpsertQuery,
   createDrizzleProfileRepository,
   createInMemoryProfileRepository,
@@ -245,15 +246,34 @@ test("atomic profile save resolves the user and persists the role", async () => 
   );
 });
 
+test("atomic profile save marks the user onboarding as done", async () => {
+  const repository = createInMemoryProfileRepository();
+
+  const saved = await repository.saveProfileForPrivyUser(
+    "did:privy:onboarded",
+    "candidate",
+    { displayName: "Onboarded Candidate" },
+  );
+
+  assert.equal(saved.user.onboardingDone, true);
+  assert.equal(
+    (await repository.resolveUser("did:privy:onboarded")).onboardingDone,
+    true,
+  );
+});
+
 test("Drizzle atomic profile save rolls back when the profile upsert fails", async () => {
   const committedUsers = new Map<string, string>();
   let transactionCalls = 0;
   const transactionStore: ProfileTransactionStore = {
     async resolveUser(privyUserId) {
-      return { id: "user-1", privyUserId };
+      return { id: "user-1", privyUserId, walletAddress: null, onboardingDone: false };
     },
     async upsertProfile() {
       throw new Error("profile write failed");
+    },
+    async markOnboardingDone() {
+      throw new Error("onboarding should not be marked after profile failure");
     },
   };
   const repository = createDrizzleProfileRepository(undefined, {
@@ -297,11 +317,20 @@ test("Drizzle atomic profile save uses one transaction store for both writes", a
       operation({
         async resolveUser(privyUserId) {
           calls.push(`user:${privyUserId}`);
-          return { id: "user-1", privyUserId };
+          return { id: "user-1", privyUserId, walletAddress: null, onboardingDone: false };
         },
         async upsertProfile(userId, role, profile) {
           calls.push(`profile:${userId}:${role}`);
           return profile;
+        },
+        async markOnboardingDone(userId) {
+          calls.push(`onboarding:${userId}`);
+          return {
+            id: userId,
+            privyUserId: "did:privy:query",
+            walletAddress: null,
+            onboardingDone: true,
+          };
         },
       }),
   });
@@ -315,9 +344,15 @@ test("Drizzle atomic profile save uses one transaction store for both writes", a
   assert.deepEqual(calls, [
     "user:did:privy:query",
     "profile:user-1:recruiter",
+    "onboarding:user-1",
   ]);
   assert.deepEqual(saved, {
-    user: { id: "user-1", privyUserId: "did:privy:query" },
+    user: {
+      id: "user-1",
+      privyUserId: "did:privy:query",
+      walletAddress: null,
+      onboardingDone: true,
+    },
     profile: { company: "Shire" },
   });
 });
@@ -335,9 +370,15 @@ test("Drizzle profile persistence builds conflict-update upserts", () => {
     "candidate",
     { displayName: "SQL Candidate" },
   ).toSQL();
+  const onboardingQuery = buildProfileUserOnboardingDoneQuery(
+    database,
+    "user-1",
+  ).toSQL();
 
   assert.match(userQuery.sql, /insert into "app_users"/);
   assert.match(userQuery.sql, /on conflict \("privy_user_id"\) do update/);
   assert.match(profileQuery.sql, /insert into "candidate_profiles"/);
   assert.match(profileQuery.sql, /on conflict \("user_id"\) do update/);
+  assert.match(onboardingQuery.sql, /update "app_users"/);
+  assert.match(onboardingQuery.sql, /"onboarding_done" = \$1/);
 });

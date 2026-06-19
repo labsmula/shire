@@ -20,6 +20,7 @@ import {
 } from "./db";
 import { recruiterProfiles } from "./db/schema";
 import {
+  buildProfileUserOnboardingDoneQuery,
   buildProfileUserUpsertQuery,
   buildRoleProfileUpsertQuery,
   createDrizzleProfileRepository,
@@ -59,6 +60,7 @@ function storedSchema(role: ProfileRole) {
 
 async function saveRecruiterProfileAtomically(
   privyUserId: string,
+  walletAddress: string | undefined,
   editableProfile: Record<string, unknown>,
   database: Database,
 ) {
@@ -67,6 +69,7 @@ async function saveRecruiterProfileAtomically(
       const [user] = await buildProfileUserUpsertQuery(
         transaction,
         privyUserId,
+        walletAddress,
       );
       if (!user) {
         throw new Error("User upsert returned no row.");
@@ -95,7 +98,14 @@ async function saveRecruiterProfileAtomically(
       if (!saved) {
         throw new Error("Recruiter profile upsert returned no row.");
       }
-      return { user, profile: saved.profile };
+      const [onboardedUser] = await buildProfileUserOnboardingDoneQuery(
+        transaction,
+        user.id,
+      );
+      if (!onboardedUser) {
+        throw new Error("User onboarding update returned no row.");
+      }
+      return { user: onboardedUser, profile: saved.profile };
     });
   } catch (error) {
     if (
@@ -148,7 +158,10 @@ export function createProfileRouteHandlers(
     try {
       const authenticatedUser = await authenticate(request);
       const store = repository();
-      const user = await store.resolveUser(authenticatedUser.privyUserId);
+      const user = await store.resolveUser(
+        authenticatedUser.privyUserId,
+        authenticatedUser.mode === "privy" ? authenticatedUser.walletAddress : undefined,
+      );
       const storedProfile = await store.getProfile(user.id, role);
       if (storedProfile === null) {
         return NextResponse.json(
@@ -184,7 +197,10 @@ export function createProfileRouteHandlers(
       if (role === "recruiter") {
         if (dependencies.repository) {
           const store = dependencies.repository;
-          const user = await store.resolveUser(authenticatedUser.privyUserId);
+          const user = await store.resolveUser(
+            authenticatedUser.privyUserId,
+            authenticatedUser.mode === "privy" ? authenticatedUser.walletAddress : undefined,
+          );
           const existing = await store.getProfile(user.id, role);
           const metrics = existing
             ? storedRecruiterProfileSchema.parse(existing)
@@ -199,10 +215,12 @@ export function createProfileRouteHandlers(
               completedHires: metrics.completedHires,
               disputeCount: metrics.disputeCount,
             },
+            authenticatedUser.mode === "privy" ? authenticatedUser.walletAddress : undefined,
           );
         } else {
           saved = await saveRecruiterProfileAtomically(
             authenticatedUser.privyUserId,
+            authenticatedUser.mode === "privy" ? authenticatedUser.walletAddress : undefined,
             parsed.data as Record<string, unknown>,
             dependencies.database ?? createDatabase(),
           );
@@ -212,6 +230,7 @@ export function createProfileRouteHandlers(
           authenticatedUser.privyUserId,
           role,
           parsed.data,
+          authenticatedUser.mode === "privy" ? authenticatedUser.walletAddress : undefined,
         );
       }
       const persisted = responseSchema.safeParse(saved.profile);

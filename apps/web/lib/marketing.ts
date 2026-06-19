@@ -16,22 +16,54 @@ export const heroChips = [
   "DevOps Engineer",
 ] as const;
 
-export const trustLogos = [
-  "Aperture",
-  "Northwind",
-  "Mesh",
-  "Brightside",
-  "Helia",
-  "Outline",
-] as const;
+/** The three beats of the story-driven hero workflow card. */
+export type HeroStep = {
+  id: "match" | "stake" | "settle";
+  num: string;
+  title: string;
+  detail: string;
+};
+
+export const heroSteps: HeroStep[] = [
+  {
+    id: "match",
+    num: "1",
+    title: "Match",
+    detail: "Senior Frontend Engineer · 94% fit",
+  },
+  {
+    id: "stake",
+    num: "2",
+    title: "Stake",
+    detail: "250 cUSD locked in escrow",
+  },
+  {
+    id: "settle",
+    num: "3",
+    title: "Settle",
+    detail: "Funds released on confirm",
+  },
+];
+
+export type TrustLogo = { name: string; metric: string };
+
+/** Realistic placeholder companies with a specific outcome metric each. */
+export const trustLogos: TrustLogo[] = [
+  { name: "Meridian", metric: "12 hires · $4.2k avg stake" },
+  { name: "Outpost", metric: "9 hires · zero no-shows" },
+  { name: "Northbound", metric: "6 hires · 38h to signed" },
+  { name: "Lattice", metric: "14 hires · $5.1k avg stake" },
+  { name: "Harbor", metric: "4 hires · zero disputes" },
+  { name: "Cadence", metric: "11 hires · 31h to signed" },
+];
 
 export type Stat = { value: string; label: string };
 
 export const stats: Stat[] = [
-  { value: "70,000+", label: "Roles matched by AI every week" },
-  { value: "40 hrs", label: "Saved per hire on screening" },
-  { value: "35,000+", label: "Placements settled onchain" },
-  { value: "100%", label: "Stake protected by escrow" },
+  { value: "2,400+", label: "Matches ranked every week" },
+  { value: "$1.2M", label: "Held in escrow right now" },
+  { value: "48h", label: "Average time to a verified hire" },
+  { value: "100%", label: "Stake protected until confirmed" },
 ];
 
 export type Step = { num: string; title: string; body: string };
@@ -40,82 +72,53 @@ export const steps: Step[] = [
   {
     num: "01",
     title: "Sign in & upload",
-    body: "Sign in with email or wallet — we create a secure wallet for you — and drop in your CV or open role. No long forms.",
+    body: "Sign in with email or Google — Shire sets up your account — then drop in your CV or open role. No long forms, no crypto setup.",
   },
   {
     num: "02",
     title: "AI builds & matches",
-    body: "Shire drafts a structured profile and surfaces ranked matches with clear reasons.",
+    body: "Shire drafts a structured profile and surfaces ranked matches, each with the reasons behind it so you can trust the pick.",
   },
   {
     num: "03",
     title: "Approve & settle",
-    body: "You approve the move. Stablecoin escrow on Celo locks the stake and settles on success.",
+    body: "You approve the move. A refundable stake locks in escrow and releases automatically the moment both sides confirm.",
   },
 ];
-
-export type FeatureIcon =
-  | "LayoutGrid"
-  | "Sparkles"
-  | "FileText"
-  | "Users"
-  | "Activity"
-  | "ShieldCheck"
-  | "Scale"
-  | "MessageSquare"
-  | "BellRing";
 
 export type Feature = {
   title: string;
   body: string;
-  icon: FeatureIcon;
+  /** Optional match demo: renders an animated match-score bar on hover. */
+  match?: { score: number; skills: string[] };
 };
 
+/** Editorial feature grid — title + one line, no heavy cards. */
 export const features: Feature[] = [
   {
-    title: "Integrated applications",
-    body: "Apply from anywhere in Shire. One profile, tracked end-to-end across every role.",
-    icon: "LayoutGrid",
-  },
-  {
     title: "AI match engine",
-    body: "Rule-based skill overlap plus reasoning surfaces the matches that actually fit.",
-    icon: "Sparkles",
+    body: "Skill overlap plus reasoning surfaces the matches that fit — with the reasons attached.",
+    match: { score: 94, skills: ["React", "TypeScript", "Celo"] },
   },
   {
     title: "Smart CV parsing",
-    body: "Upload a resume; get a clean, structured profile draft you can edit and confirm.",
-    icon: "FileText",
-  },
-  {
-    title: "Talent recommendations",
-    body: "Companies get ranked candidates with match scores and the reasons behind them.",
-    icon: "Users",
-  },
-  {
-    title: "Real-time tracking",
-    body: "Every application's status, stake, and next step in one live dashboard.",
-    icon: "Activity",
+    body: "Upload a resume and get a clean, structured profile draft you can edit and confirm.",
   },
   {
     title: "Onchain escrow",
-    body: "Stablecoin stake on Celo locks commitment from both sides and settles on completion.",
-    icon: "ShieldCheck",
+    body: "A refundable stake locks commitment from both sides and settles on completion. Locked, never spent.",
   },
   {
-    title: "Dispute resolution",
-    body: "Structured evidence and an AI summary give the resolver a clear, fair picture.",
-    icon: "Scale",
+    title: "Live tracking",
+    body: "Every application's status, stake, and next step in one dashboard — no inbox archaeology.",
   },
   {
-    title: "Interview readiness",
-    body: "Role-specific prep and gaps to close before you walk into the conversation.",
-    icon: "MessageSquare",
+    title: "Fair dispute resolution",
+    body: "Structured evidence and an AI summary give a human resolver a clear, neutral picture.",
   },
   {
     title: "Daily match digest",
-    body: "A short, relevant digest of new matches — not another noisy inbox.",
-    icon: "BellRing",
+    body: "A short, relevant digest of new matches — not another noisy inbox to clear.",
   },
 ];
 
@@ -126,59 +129,59 @@ export type Testimonial = {
   initials: string;
 };
 
+/** One big pull-quote for the editorial flow (UserJot-style). */
+export const featuredQuote: Testimonial = {
+  quote:
+    "The stake is what changed everything. Once both sides had skin in the game, the ghosting stopped overnight. Three hires in, zero no-shows.",
+  name: "Sara Lindgren",
+  role: "Head of Talent, Meridian",
+  initials: "SL",
+};
+
 export const testimonials: Testimonial[] = [
   {
     quote:
-      "I uploaded my CV at night and woke up to three strong matches with reasons attached. The escrow made the company actually commit.",
-    name: "Sara Lindgren",
-    role: "Frontend Engineer",
-    initials: "SL",
-  },
-  {
-    quote:
-      "We cut screening time in half. The match reasons are specific enough that our recruiters trust them.",
+      "We cut screening time in half. The match reasons are specific enough that our recruiters actually trust them.",
     name: "Daniel Okafor",
-    role: "Head of Talent, Mesh",
+    role: "Recruiting Lead, Outpost",
     initials: "DO",
   },
   {
     quote:
-      "Staking sounds scary until you do it once. Funds are locked, not spent, and released the moment we both confirm.",
+      "Staking sounded scary until I did it once. Funds are locked, not spent — and released the moment we both confirm.",
     name: "Priya Nair",
     role: "Engineering Manager",
     initials: "PN",
   },
 ];
 
-export const integrations = [
-  "Slack",
-  "Notion",
-  "GitHub",
-  "Linear",
-  "Gmail",
-  "Calendar",
-  "Greenhouse",
-  "Zoom",
-] as const;
+export type Metric = { value: string; label: string };
+
+/** Big-number band — outcome stats, not vanity volume. */
+export const metrics: Metric[] = [
+  { value: "4×", label: "Faster from match to signed offer" },
+  { value: "40%", label: "Less screening time per role" },
+  { value: "0", label: "Ghosted hires after a stake locks" },
+];
 
 export type Faq = { q: string; a: string };
 
 export const faqs: Faq[] = [
   {
+    q: "What exactly is the stake, and is my money safe?",
+    a: "When you apply or accept, a small stablecoin stake is locked in escrow — not spent, not paid to us. It signals real commitment from both sides and is released automatically when you both confirm completion. Funds never leave escrow until that point.",
+  },
+  {
     q: "How does the AI matching work?",
     a: "Shire turns your CV or job post into a structured profile, then ranks matches using skill overlap plus reasoning. Every match comes with the reasons behind it — and the AI never applies or stakes on your behalf.",
   },
   {
-    q: "What is staking, and is my money safe?",
-    a: "When you apply or accept, a small stablecoin stake is locked in escrow on Celo — not spent. It signals real commitment from both sides and is released automatically when you both confirm completion.",
-  },
-  {
     q: "Do I need crypto experience to use Shire?",
-    a: "No. You sign in with a wallet (including MiniPay), and the staking flow is a single approval. Amounts are shown in stablecoins like cUSD, and you always approve before anything happens.",
+    a: "No. You sign in with email or Google and Shire sets up your account. The staking flow is a single approval, amounts show in USD-pegged cUSD, and you always approve before anything happens.",
   },
   {
     q: "Can I be both a candidate and a company?",
-    a: "Yes. One wallet is one identity that can find work, find talent, or both. Switch modes anytime — your permissions are contextual, not locked to a role.",
+    a: "Yes. One account is one identity that can find work, find talent, or both. Switch modes anytime — your permissions are contextual, not locked to a role.",
   },
   {
     q: "What happens if there's a dispute?",

@@ -1,7 +1,15 @@
 "use client";
 
+import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Briefcase, Sparkles, Users } from "lucide-react";
+import { useAccessToken } from "@/lib/auth/use-access-token";
+import { PRIVY_ENABLED } from "@/lib/auth/use-auth";
+import {
+  getActiveRoleState,
+  onboardingChoiceDestination,
+  postOnboardingDestination,
+} from "@/lib/role-client";
 import { AuthShell } from "@/components/layout/auth-shell";
 import { cn } from "@/lib/utils";
 
@@ -11,26 +19,65 @@ const roles = [
     icon: Sparkles,
     label: "Find Jobs",
     description: "AI matches you to verified, stake-backed roles. No spam recruiters.",
-    href: "/onboarding/candidate",
   },
   {
     id: "recruiter",
     icon: Briefcase,
     label: "Find Talent",
     description: "Post stake-backed jobs and let AI surface the best-fit candidates.",
-    href: "/onboarding/recruiter",
   },
   {
     id: "both",
     icon: Users,
     label: "Both",
-    description: "Switch between hiring and applying with one wallet identity.",
-    href: "/onboarding/candidate",
+    description: "Switch between hiring and applying with one Shire account.",
   },
 ] as const;
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const accessToken = useAccessToken();
+  const [checkingRoles, setCheckingRoles] = React.useState(PRIVY_ENABLED);
+
+  React.useEffect(() => {
+    if (!PRIVY_ENABLED) return;
+
+    let cancelled = false;
+    async function redirectIfOnboarded() {
+      setCheckingRoles(true);
+      try {
+        const token = await accessToken();
+        const activeRoles = await getActiveRoleState(token);
+        const destination = postOnboardingDestination(activeRoles);
+        if (!cancelled && destination) {
+          router.replace(destination);
+        }
+      } catch {
+        if (!cancelled) {
+          setCheckingRoles(false);
+        }
+        return;
+      }
+      if (!cancelled) {
+        setCheckingRoles(false);
+      }
+    }
+
+    void redirectIfOnboarded();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, router]);
+
+  if (checkingRoles) {
+    return (
+      <AuthShell back={{ href: "/connect", label: "Back" }} step="1 of 3">
+        <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
+          Checking your account...
+        </div>
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell back={{ href: "/connect", label: "Back" }} step="1 of 3">
@@ -43,11 +90,11 @@ export default function OnboardingPage() {
         </div>
 
         <ul className="space-y-3">
-          {roles.map(({ id, icon: Icon, label, description, href }) => (
+          {roles.map(({ id, icon: Icon, label, description }) => (
             <li key={id}>
               <button
                 type="button"
-                onClick={() => router.push(href)}
+                onClick={() => router.push(onboardingChoiceDestination(id))}
                 className={cn(
                   "w-full rounded-2xl border border-border bg-card p-4 text-left transition-[border-color,box-shadow] hover:border-primary/50 hover:shadow-sm",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

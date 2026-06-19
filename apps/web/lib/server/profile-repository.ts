@@ -12,6 +12,8 @@ export type ProfileRole = "candidate" | "recruiter";
 export type ProfileUser = {
   id: string;
   privyUserId: string;
+  walletAddress: string | null;
+  onboardingDone: boolean;
 };
 
 export type SavedProfile = {
@@ -20,20 +22,22 @@ export type SavedProfile = {
 };
 
 export interface ProfileTransactionStore {
-  resolveUser(privyUserId: string): Promise<ProfileUser>;
+  resolveUser(privyUserId: string, walletAddress?: string): Promise<ProfileUser>;
   upsertProfile(
     userId: string,
     role: ProfileRole,
     profile: Record<string, unknown>,
   ): Promise<unknown>;
+  markOnboardingDone(userId: string): Promise<ProfileUser>;
 }
 
 export interface ProfileRepository {
-  resolveUser(privyUserId: string): Promise<ProfileUser>;
+  resolveUser(privyUserId: string, walletAddress?: string): Promise<ProfileUser>;
   saveProfileForPrivyUser(
     privyUserId: string,
     role: ProfileRole,
     profile: unknown,
+    walletAddress?: string,
   ): Promise<SavedProfile>;
   getProfile(userId: string, role: ProfileRole): Promise<unknown | null>;
   upsertProfile(
@@ -65,7 +69,7 @@ function profileRecord(profile: unknown): Record<string, unknown> {
 type DatabaseTransaction = Parameters<
   Parameters<Database["transaction"]>[0]
 >[0];
-type DrizzleWriteExecutor = Pick<Database | DatabaseTransaction, "insert">;
+type DrizzleWriteExecutor = Pick<Database | DatabaseTransaction, "insert" | "update">;
 
 function normalizedPrivyUserId(privyUserId: string) {
   const normalized = privyUserId.trim();
@@ -78,25 +82,49 @@ function normalizedPrivyUserId(privyUserId: string) {
 export function buildProfileUserUpsertQuery(
   executor: DrizzleWriteExecutor,
   privyUserId: string,
+  walletAddress?: string,
 ) {
+  const values = walletAddress ? { privyUserId, walletAddress } : { privyUserId };
   return executor
     .insert(appUsers)
-    .values({ privyUserId })
+    .values(values)
     .onConflictDoUpdate({
       target: appUsers.privyUserId,
-      set: { updatedAt: new Date() },
+      set: {
+        updatedAt: new Date(),
+        ...(walletAddress ? { walletAddress } : {}),
+      },
     })
     .returning({
       id: appUsers.id,
       privyUserId: appUsers.privyUserId,
+      walletAddress: appUsers.walletAddress,
+      onboardingDone: appUsers.onboardingDone,
+    });
+}
+
+export function buildProfileUserOnboardingDoneQuery(
+  executor: DrizzleWriteExecutor,
+  userId: string,
+) {
+  return executor
+    .update(appUsers)
+    .set({ onboardingDone: true, updatedAt: new Date() })
+    .where(eq(appUsers.id, userId))
+    .returning({
+      id: appUsers.id,
+      privyUserId: appUsers.privyUserId,
+      walletAddress: appUsers.walletAddress,
+      onboardingDone: appUsers.onboardingDone,
     });
 }
 
 async function resolveDrizzleUser(
   executor: DrizzleWriteExecutor,
   privyUserId: string,
+  walletAddress?: string,
 ) {
-  const [user] = await buildProfileUserUpsertQuery(executor, privyUserId);
+  const [user] = await buildProfileUserUpsertQuery(executor, privyUserId, walletAddress);
   if (!user) {
     throw new Error("User upsert returned no row.");
   }
@@ -154,10 +182,21 @@ function createDrizzleTransactionStore(
   executor: DrizzleWriteExecutor,
 ): ProfileTransactionStore {
   return {
-    resolveUser: (privyUserId) =>
-      resolveDrizzleUser(executor, normalizedPrivyUserId(privyUserId)),
+    resolveUser: (privyUserId, walletAddress) =>
+      resolveDrizzleUser(
+        executor,
+        normalizedPrivyUserId(privyUserId),
+        walletAddress,
+      ),
     upsertProfile: (userId, role, profile) =>
       upsertDrizzleProfile(executor, userId, role, profile),
+    markOnboardingDone: async (userId) => {
+      const [user] = await buildProfileUserOnboardingDoneQuery(executor, userId);
+      if (!user) {
+        throw new Error("User onboarding update returned no row.");
+      }
+      return user;
+    },
   };
 }
 
@@ -189,11 +228,11 @@ export function createDrizzleProfileRepository(
       ));
 
   return {
-    async resolveUser(privyUserId) {
+    async resolveUser(privyUserId, walletAddress) {
       const normalized = normalizedPrivyUserId(privyUserId);
 
       try {
-        return await resolveDrizzleUser(requireDatabase(), normalized);
+        return await resolveDrizzleUser(requireDatabase(), normalized, walletAddress);
       } catch (error) {
         if (error instanceof ProfileRepositoryError) {
           throw error;
@@ -204,18 +243,19 @@ export function createDrizzleProfileRepository(
       }
     },
 
-    async saveProfileForPrivyUser(privyUserId, role, profile) {
+    async saveProfileForPrivyUser(privyUserId, role, profile, walletAddress) {
       const normalized = normalizedPrivyUserId(privyUserId);
       const savedProfile = profileRecord(profile);
       try {
         return await runTransaction(async (store) => {
-          const user = await store.resolveUser(normalized);
+          const user = await store.resolveUser(normalized, walletAddress);
           const persistedProfile = await store.upsertProfile(
             user.id,
             role,
             savedProfile,
           );
-          return { user, profile: persistedProfile };
+          const onboardedUser = await store.markOnboardingDone(user.id);
+          return { user: onboardedUser, profile: persistedProfile };
         });
       } catch (error) {
         if (error instanceof ProfileRepositoryError) {
@@ -248,12 +288,14 @@ export function createDrizzleProfileRepository(
     async upsertProfile(userId, role, profile) {
       const savedProfile = profileRecord(profile);
       try {
-        return await upsertDrizzleProfile(
+        const persistedProfile = await upsertDrizzleProfile(
           requireDatabase(),
           userId,
           role,
           savedProfile,
         );
+        await buildProfileUserOnboardingDoneQuery(requireDatabase(), userId);
+        return persistedProfile;
       } catch (error) {
         if (error instanceof ProfileRepositoryError) {
           throw error;
@@ -311,17 +353,22 @@ export function createInMemoryProfileRepository(): ProfileRepository {
     return owner;
   }
 
-  async function resolveUser(privyUserId: string) {
+  async function resolveUser(privyUserId: string, walletAddress?: string) {
     const normalized = normalizedPrivyUserId(privyUserId);
 
     const existing = usersByPrivyId.get(normalized);
     if (existing) {
+      if (walletAddress) {
+        existing.walletAddress = walletAddress;
+      }
       return existing;
     }
 
     const user = {
       id: crypto.randomUUID(),
       privyUserId: normalized,
+      walletAddress: walletAddress ?? null,
+      onboardingDone: false,
     };
     usersByPrivyId.set(normalized, user);
     return user;
@@ -340,15 +387,17 @@ export function createInMemoryProfileRepository(): ProfileRepository {
     };
     current[role] = profile;
     profiles.set(userId, current);
+    const owner = profileOwner(userId);
+    owner.onboardingDone = true;
     return profile;
   }
 
   return {
     resolveUser,
-    async saveProfileForPrivyUser(privyUserId, role, profile) {
+    async saveProfileForPrivyUser(privyUserId, role, profile, walletAddress) {
       const normalized = normalizedPrivyUserId(privyUserId);
       const savedProfile = profileRecord(profile);
-      const user = await resolveUser(normalized);
+      const user = await resolveUser(normalized, walletAddress);
       const persistedProfile = await upsertProfile(
         user.id,
         role,
