@@ -104,8 +104,8 @@ export function StakeFlow() {
               <Actor label="Company" icon={BriefcaseIcon} active={phase !== "match"} />
             </div>
 
-            <div className="relative mt-8 h-12 rounded-full border border-dashed border-border/80 bg-background/60 sm:mt-10">
-              {/* <div
+            <div className="relative mt-8 h-10 sm:mt-10">
+              <div
                 className={cn(
                   "pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 transition-[left] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
                   chipAt === "left"
@@ -114,7 +114,7 @@ export function StakeFlow() {
                       ? "left-1/2 -translate-x-1/2"
                       : "left-[87%] -translate-x-full",
                 )}
-              > */}
+              >
                 <span
                   className={cn(
                     "inline-flex whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors duration-500",
@@ -127,7 +127,7 @@ export function StakeFlow() {
                 >
                   250 cUSD
                 </span>
-              {/* </div> */}
+              </div>
             </div>
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
