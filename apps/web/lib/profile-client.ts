@@ -47,6 +47,26 @@ function authorizationHeaders(accessToken?: string) {
   return headers;
 }
 
+type ProfileCacheEntry = {
+  expiresAt: number;
+  promise: Promise<unknown>;
+};
+
+const PROFILE_CACHE_TTL_MS = 15_000;
+const profileCache = new Map<string, ProfileCacheEntry>();
+
+function profileCacheKey(role: ProfileRole, accessToken?: string) {
+  return `${role}:${accessToken ?? "demo"}`;
+}
+
+function clearProfileCache(role?: ProfileRole, accessToken?: string) {
+  if (role) {
+    profileCache.delete(profileCacheKey(role, accessToken));
+    return;
+  }
+  profileCache.clear();
+}
+
 async function readProfileResponse<T>(response: Response): Promise<T> {
   if (response.status === 401) throw new ProfileUnauthorizedError();
   if (response.status === 403) throw new ProfileForbiddenError();
@@ -79,12 +99,37 @@ export async function getProfile<T>(
   accessToken?: string,
   fetcher: typeof fetch = fetch,
 ): Promise<T> {
-  const response = await fetcher(profileUrl(role), {
+  if (fetcher !== fetch) {
+    const response = await fetcher(profileUrl(role), {
+      method: "GET",
+      headers: authorizationHeaders(accessToken),
+    });
+
+    return readProfileResponse<T>(response);
+  }
+
+  const key = profileCacheKey(role, accessToken);
+  const cached = profileCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.promise as Promise<T>;
+  }
+
+  const promise = fetcher(profileUrl(role), {
     method: "GET",
     headers: authorizationHeaders(accessToken),
+  })
+    .then((response) => readProfileResponse<T>(response))
+    .catch((error) => {
+      profileCache.delete(key);
+      throw error;
+    });
+
+  profileCache.set(key, {
+    expiresAt: Date.now() + PROFILE_CACHE_TTL_MS,
+    promise,
   });
 
-  return readProfileResponse<T>(response);
+  return promise;
 }
 
 export async function saveProfile<TResponse, TPayload = TResponse>(
@@ -93,6 +138,7 @@ export async function saveProfile<TResponse, TPayload = TResponse>(
   accessToken?: string,
   fetcher: typeof fetch = fetch,
 ): Promise<TResponse> {
+  clearProfileCache(role, accessToken);
   const response = await fetcher(profileUrl(role), {
     method: "PUT",
     headers: {
@@ -102,5 +148,7 @@ export async function saveProfile<TResponse, TPayload = TResponse>(
     body: JSON.stringify(profile),
   });
 
-  return readProfileResponse<TResponse>(response);
+  const saved = await readProfileResponse<TResponse>(response);
+  clearProfileCache(role, accessToken);
+  return saved;
 }

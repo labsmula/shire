@@ -104,9 +104,6 @@ function ChatPanelHeader({
             {isRunning ? "Thinking" : "Ready"}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Scope-aware assistant for the current page.
-        </p>
       </div>
       <ChatContextBadge label={buildChatContextLabel(scope)} />
     </div>

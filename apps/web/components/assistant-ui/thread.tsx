@@ -119,13 +119,9 @@ function ThinkingState() {
   return (
     <AITextLoading
       containerClassName="justify-start p-0"
-      className="text-sm font-semibold tracking-wide text-muted-foreground"
-      interval={1000}
-      texts={[
-        "Reading page context...",
-        "Checking your role...",
-        "Preparing a structured answer...",
-      ]}
+      className="text-xs font-normal tracking-normal text-muted-foreground"
+      interval={1400}
+      texts={["Waiting for Shire assistant..."]}
     />
   );
 }
@@ -157,7 +153,7 @@ function StatusPanel({
   );
 }
 
-function MarkdownText({ text }: { text: string }) {
+export function MarkdownText({ text }: { text: string }) {
   const blocks = parseMarkdownBlocks(text);
 
   return (
@@ -201,6 +197,9 @@ function MarkdownText({ text }: { text: string }) {
             </pre>
           );
         }
+        if (block.type === "table") {
+          return <MarkdownTable key={index} header={block.header} rows={block.rows} />;
+        }
         return (
           <p key={index} className="whitespace-pre-wrap">
             {renderInlineMarkdown(block.text)}
@@ -216,7 +215,8 @@ type MarkdownBlock =
   | { type: "heading"; text: string }
   | { type: "list"; items: string[] }
   | { type: "quote"; text: string }
-  | { type: "code"; text: string };
+  | { type: "code"; text: string }
+  | { type: "table"; header: string[]; rows: string[][] };
 
 function parseMarkdownBlocks(text: string): MarkdownBlock[] {
   const lines = text.split(/\r?\n/);
@@ -239,7 +239,8 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
     }
   }
 
-  for (const rawLine of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
     const line = rawLine.trimEnd();
 
     if (line.trim().startsWith("```")) {
@@ -288,6 +289,19 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
       continue;
     }
 
+    const maybeTable = parseTableAt(lines, index);
+    if (maybeTable) {
+      flushParagraph();
+      flushList();
+      blocks.push({
+        type: "table",
+        header: maybeTable.header,
+        rows: maybeTable.rows,
+      });
+      index += maybeTable.consumed - 1;
+      continue;
+    }
+
     flushList();
     paragraph.push(line);
   }
@@ -297,6 +311,75 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
   flushList();
 
   return blocks.length ? blocks : [{ type: "paragraph", text }];
+}
+
+function MarkdownTable({ header, rows }: { header: string[]; rows: string[][] }) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border">
+      <table className="w-full min-w-max border-collapse text-left text-xs">
+        <thead className="bg-muted/50 text-muted-foreground">
+          <tr>
+            {header.map((cell, index) => (
+              <th key={index} className="border-b border-border px-3 py-2 font-semibold">
+                {renderInlineMarkdown(cell)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex} className="odd:bg-background even:bg-muted/20">
+              {header.map((_, cellIndex) => (
+                <td key={cellIndex} className="border-b border-border/60 px-3 py-2">
+                  {renderInlineMarkdown(row[cellIndex] ?? "")}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function parseTableAt(lines: string[], startIndex: number) {
+  const headerLine = lines[startIndex]?.trim();
+  const separatorLine = lines[startIndex + 1]?.trim();
+  if (!headerLine?.includes("|") || !separatorLine?.includes("|")) {
+    return undefined;
+  }
+
+  const header = splitTableRow(headerLine);
+  const separator = splitTableRow(separatorLine);
+  const validSeparator =
+    header.length > 1 &&
+    separator.length === header.length &&
+    separator.every((cell) => /^:?-{3,}:?$/.test(cell));
+
+  if (!validSeparator) {
+    return undefined;
+  }
+
+  const rows: string[][] = [];
+  let consumed = 2;
+  for (let index = startIndex + 2; index < lines.length; index += 1) {
+    const line = lines[index]?.trim();
+    if (!line || !line.includes("|")) {
+      break;
+    }
+    rows.push(splitTableRow(line));
+    consumed += 1;
+  }
+
+  return { header, rows, consumed };
+}
+
+function splitTableRow(line: string) {
+  return line
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
 }
 
 function renderInlineMarkdown(text: string) {

@@ -273,6 +273,91 @@ test("health remains public when chat service auth is configured", async () => {
   }
 });
 
+test("product Q&A rejects requests without the service token", async () => {
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, () => resolve());
+  });
+
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/product-qna`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question: "How does Shire work?" }),
+      },
+    );
+
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { status: "unauthorized" });
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("product Q&A rate limits repeated public questions", async () => {
+  let now = 1_000;
+  const server = await createRuntimeHttpServer({
+    serviceToken: CHAT_SERVICE_TOKEN,
+    now: () => now,
+    answerProductQuestion: async () => ({
+      answer: "Shire is a hiring product.",
+      knowledgePaths: [],
+    }),
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, () => resolve());
+  });
+
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    const url = `http://127.0.0.1:${address.port}/product-qna`;
+
+    for (let index = 0; index < env.chatRateLimitRequests; index += 1) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: chatHeaders(),
+        body: JSON.stringify({ question: `How does Shire work ${index}?` }),
+      });
+      assert.equal(response.status, 200);
+    }
+
+    const limited = await fetch(url, {
+      method: "POST",
+      headers: chatHeaders(),
+      body: JSON.stringify({ question: "How does Shire work now?" }),
+    });
+
+    assert.equal(limited.status, 429);
+    assert.equal(limited.headers.get("retry-after"), "60");
+    assert.deepEqual(await limited.json(), { status: "rate-limited" });
+
+    now += env.chatRateLimitWindowSeconds * 1000;
+    const restored = await fetch(url, {
+      method: "POST",
+      headers: chatHeaders(),
+      body: JSON.stringify({ question: "How does Shire work later?" }),
+    });
+
+    assert.equal(restored.status, 200);
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
 test("chat route blocks prompt injection with a deterministic stream", async () => {
   const server = await createRuntimeHttpServer({
     serviceToken: CHAT_SERVICE_TOKEN,

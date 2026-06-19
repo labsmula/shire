@@ -22,6 +22,15 @@ export function buildChatScopeLabel(input: {
     return `${roleLabel(input.role)} / General`;
   }
 
+  if (
+    (input.role === "candidate" && input.resourceType === "candidate") ||
+    (input.role === "recruiter" && input.resourceType === "company")
+  ) {
+    return input.resourceLabel
+      ? `${roleLabel(input.role)} / ${input.resourceLabel}`
+      : roleLabel(input.role);
+  }
+
   const typeLabel = resourceTypeLabel(input.resourceType);
   return input.resourceLabel
     ? `${roleLabel(input.role)} / ${typeLabel} / ${input.resourceLabel}`

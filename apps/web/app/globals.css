@@ -272,6 +272,22 @@
   }
 }
 
+@keyframes shire-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  22% {
+    transform: rotate(18deg);
+  }
+  44% {
+    transform: rotate(-10deg);
+  }
+  66% {
+    transform: rotate(12deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
